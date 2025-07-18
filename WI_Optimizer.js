@@ -698,41 +698,106 @@
         });
 
         const handleBatchDelete = errorCatched(async () => {
-            const selectedBooks = Array.from(appState.selectedItems)
-                .filter(key => key.startsWith('book:'))
-                .map(key => key.substring(5));
-
-            if (selectedBooks.length === 0) {
-                await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书。' });
+            if (appState.selectedItems.size === 0) {
+                await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的项目。' });
                 return;
             }
+
+            const selectedBooks = new Set();
+            const selectedEntriesByBook = new Map();
+            const selectedRegexIds = new Set();
+
+            for (const itemKey of appState.selectedItems) {
+                const [type, ...parts] = itemKey.split(':');
+                if (type === 'book') {
+                    selectedBooks.add(parts[0]);
+                } else if (type === 'lore') {
+                    const [bookName, entryId] = parts;
+                    if (!selectedEntriesByBook.has(bookName)) {
+                        selectedEntriesByBook.set(bookName, []);
+                    }
+                    selectedEntriesByBook.get(bookName).push(Number(entryId));
+                } else if (type === 'regex') {
+                    selectedRegexIds.add(parts[0]);
+                }
+            }
+
+            let confirmationText = '您确定要永久删除以下选中的项目吗？此操作无法撤销。\n\n';
+            if (selectedBooks.size > 0) confirmationText += `- ${selectedBooks.size} 本世界书\n`;
+            if (selectedEntriesByBook.size > 0) {
+                const totalEntries = Array.from(selectedEntriesByBook.values()).reduce((sum, arr) => sum + arr.length, 0);
+                confirmationText += `- ${totalEntries} 个世界书条目\n`;
+            }
+            if (selectedRegexIds.size > 0) confirmationText += `- ${selectedRegexIds.size} 条正则\n`;
 
             try {
                 await showModal({
                     type: 'confirm',
                     title: '确认删除',
-                    text: `您确定要永久删除选中的 ${selectedBooks.length} 本世界书吗？此操作无法撤销。`
+                    text: confirmationText
                 });
             } catch {
                 return; // 用户取消
             }
 
-            let deletedCount = 0;
-            for (const bookName of selectedBooks) {
-                const success = await TavernAPI.deleteLorebook(bookName);
-                if (success) {
-                    deletedCount++;
-                    appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
-                    appState.lorebookEntries.delete(bookName);
-                    appState.selectedItems.delete(`book:${bookName}`);
+            let anythingDeleted = false;
+
+            // 1. 删除世界书
+            if (selectedBooks.size > 0) {
+                for (const bookName of selectedBooks) {
+                    const success = await TavernAPI.deleteLorebook(bookName);
+                    if (success) {
+                        anythingDeleted = true;
+                        appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
+                        appState.lorebookEntries.delete(bookName);
+                        appState.selectedItems.delete(`book:${bookName}`);
+                        // Also remove any selected entries from this book
+                        for (const key of appState.selectedItems) {
+                            if (key.startsWith(`lore:${bookName}:`)) {
+                                appState.selectedItems.delete(key);
+                            }
+                        }
+                    }
                 }
             }
 
-            if (deletedCount > 0) {
+            // 2. 删除世界书条目
+            if (selectedEntriesByBook.size > 0) {
+                for (const [bookName, uids] of selectedEntriesByBook) {
+                    // Skip if the whole book was already deleted
+                    if (selectedBooks.has(bookName)) continue;
+                    
+                    const result = await TavernAPI.deleteLorebookEntries(bookName, uids);
+                    if (result && result.delete_occurred) {
+                        anythingDeleted = true;
+                        appState.lorebookEntries.set(bookName, result.entries);
+                        uids.forEach(uid => appState.selectedItems.delete(`lore:${bookName}:${uid}`));
+                    }
+                }
+            }
+
+            // 3. 删除正则
+            if (selectedRegexIds.size > 0) {
+                const allServerRegexes = await TavernAPI.getRegexes();
+                const regexesToKeep = allServerRegexes.filter(r => !selectedRegexIds.has(r.id) || r.source === 'card');
+                
+                if (regexesToKeep.length < allServerRegexes.filter(r => r.source !== 'card').length) {
+                    await TavernAPI.replaceRegexes(regexesToKeep.filter(r => r.source !== 'card'));
+                    await TavernAPI.saveSettings();
+                    anythingDeleted = true;
+                    
+                    appState.regexes.global = appState.regexes.global.filter(r => !selectedRegexIds.has(r.id));
+                    appState.regexes.character = appState.regexes.character.filter(r => !selectedRegexIds.has(r.id));
+                    selectedRegexIds.forEach(id => appState.selectedItems.delete(`regex:${id}`));
+                }
+            }
+
+            if (anythingDeleted) {
                 showSuccessTick();
+                appState.selectedItems.clear(); // Clear all selections
                 renderContent();
             } else {
-                await showModal({ type: 'alert', title: '删除失败', text: '删除世界书时发生错误，请检查控制台。' });
+                await showModal({ type: 'alert', title: '删除失败', text: '删除项目时发生错误，请检查控制台。' });
             }
         });
         
