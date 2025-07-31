@@ -756,7 +756,7 @@
                 showSuccessTick(`成功删除 ${deletedCount} 本世界书`);
                 renderContent();
             } else {
-                await showModal({ type: 'alert', title: '删除失败', text: '删除世界书时发生错误，请检查控制台。' });
+                await showModal({ type: 'alert', title: '删除失败', text: '删除项目时发生错误，请检查控制台。' });
             }
         });
         
