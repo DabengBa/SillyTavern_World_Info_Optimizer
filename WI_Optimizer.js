@@ -92,8 +92,11 @@
             try {
                 return await fn(...args);
             } catch (error) {
-                console.error(`[${context}] Error:`, error);
-                await showModal({ type: 'alert', title: '脚本异常', text: `操作中发生未知错误，请检查开发者控制台获取详细信息。` });
+                // Do not show modal for user cancellations (empty error)
+                if (error) {
+                    console.error(`[${context}] Error:`, error);
+                    await showModal({ type: 'alert', title: '脚本异常', text: `操作中发生未知错误，请检查开发者控制台获取详细信息。` });
+                }
             }
         };
 
@@ -104,25 +107,70 @@
             return div.innerHTML;
         };
 
-        const showSuccessTick = () => {
+        const showSuccessTick = (message = '操作成功', duration = 1500) => {
             const $panel = $(`#${PANEL_ID}`, parentDoc);
-            if ($panel.length === 0 || $panel.find('.rlh-success-indicator').length > 0) return;
-            const tickHtml = `<div class="rlh-success-indicator"><svg class="rlh-success-tick" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="rlh-success-tick-circle" cx="26" cy="26" r="25" fill="none"/><path class="rlh-success-tick-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg></div>`;
-            const $tick = $(tickHtml);
-            $panel.append($tick);
+            if ($panel.length === 0) return;
+            // 移除现有的提示，避免重叠
+            $panel.find('.rlh-toast-notification').remove();
+            
+            const toastHtml = `<div class="rlh-toast-notification"><i class="fa-solid fa-check-circle"></i> ${escapeHtml(message)}</div>`;
+            const $toast = $(toastHtml);
+            
+            $panel.append($toast);
+            
+            // 入场动画
             setTimeout(() => {
-                $tick.remove();
-            }, 2200);
+                $toast.addClass('visible');
+            }, 10);
+
+            // 离场动画
+            setTimeout(() => {
+                $toast.removeClass('visible');
+                setTimeout(() => {
+                    $toast.remove();
+                }, 300); // 等待CSS过渡完成
+            }, duration);
+        };
+
+        const showProgressToast = (initialMessage = '正在处理...') => {
+            const $panel = $(`#${PANEL_ID}`, parentDoc);
+            if ($panel.length === 0) return { update: () => {}, remove: () => {} };
+
+            $panel.find('.rlh-progress-toast').remove();
+
+            const toastHtml = `<div class="rlh-progress-toast"><i class="fa-solid fa-spinner fa-spin"></i> <span class="rlh-progress-text">${escapeHtml(initialMessage)}</span></div>`;
+            const $toast = $(toastHtml);
+            
+            $panel.append($toast);
+            
+            setTimeout(() => {
+                $toast.addClass('visible');
+            }, 10);
+
+            const update = (newMessage) => {
+                $toast.find('.rlh-progress-text').html(escapeHtml(newMessage));
+            };
+
+            const remove = () => {
+                $toast.removeClass('visible');
+                setTimeout(() => {
+                    $toast.remove();
+                }, 300);
+            };
+
+            return { update, remove };
         };
 
         const showModal = (options) => {
             return new Promise((resolve, reject) => {
-                const { type = 'alert', title = '通知', text = '', placeholder = '' } = options;
+                const { type = 'alert', title = '通知', text = '', placeholder = '', value = '' } = options;
                 let buttonsHtml = '';
                 if (type === 'alert') buttonsHtml = '<button class="rlh-modal-btn rlh-modal-ok">确定</button>';
                 else if (type === 'confirm') buttonsHtml = '<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok">确认</button>';
                 else if (type === 'prompt') buttonsHtml = '<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok">确定</button>';
-                const inputHtml = type === 'prompt' ? `<input type="text" class="rlh-modal-input" placeholder="${escapeHtml(placeholder)}">` : '';
+                
+                const inputHtml = type === 'prompt' ? `<input type="text" class="rlh-modal-input" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value)}">` : '';
+                
                 const modalHtml = `<div class="rlh-modal-overlay"><div class="rlh-modal-content"><div class="rlh-modal-header">${escapeHtml(title)}</div><div class="rlh-modal-body"><p>${escapeHtml(text)}</p>${inputHtml}</div><div class="rlh-modal-footer">${buttonsHtml}</div></div></div>`;
                 
                 const $modal = $(modalHtml).hide();
@@ -135,28 +183,29 @@
                 
                 $modal.fadeIn(200);
                 const $input = $modal.find('.rlh-modal-input');
-                if (type === 'prompt') $input.focus();
+                if (type === 'prompt') $input.focus().select();
                 
-                const closeModal = (isSuccess, value) => {
+                const closeModal = (isSuccess, val) => {
                     $modal.fadeOut(200, () => {
                         $modal.remove();
-                        if (isSuccess) resolve(value); else reject();
+                        if (isSuccess) resolve(val); else reject();
                     });
                 };
                 
                 $modal.on('click', '.rlh-modal-ok', () => {
-                    const value = type === 'prompt' ? $input.val() : true;
-                    if (type === 'prompt' && !String(value).trim()) {
+                    const val = type === 'prompt' ? $input.val() : true;
+                    if (type === 'prompt' && !String(val).trim()) {
                         $input.addClass('rlh-input-error');
                         setTimeout(() => $input.removeClass('rlh-input-error'), 500);
                         return;
                     }
-                    closeModal(true, value);
+                    closeModal(true, val);
                 });
                 $modal.on('click', '.rlh-modal-cancel', () => closeModal(false));
                 if (type === 'prompt') {
                     $input.on('keydown', (e) => {
                         if (e.key === 'Enter') $modal.find('.rlh-modal-ok').click();
+                        else if (e.key === 'Escape') closeModal(false);
                     });
                 }
             });
@@ -179,13 +228,13 @@
             createLorebookEntries: errorCatched(async (name, entries) => await TavernHelper.createLorebookEntries(name, entries)),
             deleteLorebookEntries: errorCatched(async (name, uids) => await TavernHelper.deleteLorebookEntries(name, uids)),
             saveSettings: errorCatched(async () => await TavernHelper.builtin.saveSettings()),
+            setCurrentCharLorebooks: errorCatched(async (lorebooks) => await TavernHelper.setCurrentCharLorebooks(lorebooks)),
         };
 
         const loadAllData = errorCatched(async () => {
             const $content = $(`#${PANEL_ID}-content`, parentDoc);
             $content.html('<p class="rlh-info-text">正在加载所有数据，请稍候...</p>');
 
-            // 获取所有角色
             const allCharacters = window.parent.SillyTavern.getContext().characters || [];
 
             const [allUIRegexes, charData, globalSettings, charLinkedBooks, allBookFileNames] = await Promise.all([
@@ -203,7 +252,6 @@
             appState.lorebookUsage.clear();
             const knownBookNames = new Set(allBookFileNames || []);
 
-            // 构建世界书使用情况映射
             if (Array.isArray(allCharacters)) {
                 await Promise.all(allCharacters.map(async (char) => {
                     const books = await TavernHelper.getCharLorebooks({ name: char.name });
@@ -241,7 +289,6 @@
             const allBooksToLoad = Array.from(knownBookNames);
             const existingBookFiles = new Set(allBookFileNames || []);
             await Promise.all(allBooksToLoad.map(async (name) => {
-                // 只加载实际存在的世界书文件
                 if (existingBookFiles.has(name)) {
                     const entries = await TavernAPI.getLorebookEntries(name) || [];
                     appState.lorebookEntries.set(name, entries);
@@ -333,7 +380,6 @@
                 case 'char-regex':
                     renderRegexView(appState.regexes.character, searchTerm, $content, '角色正则');
                     break;
-                
             }
         };
 
@@ -342,11 +388,7 @@
             let filteredBookData = [];
 
             if (!searchTerm) {
-                filteredBookData = books.map(book => ({
-                    book: book,
-                    forceShowAllEntries: true,
-                    filteredEntries: null
-                }));
+                filteredBookData = books.map(book => ({ book, forceShowAllEntries: true, filteredEntries: null }));
             } else {
                 books.forEach(book => {
                     const entries = appState.lorebookEntries.get(book.name) || [];
@@ -357,11 +399,7 @@
                     );
 
                     if (bookNameMatches || matchingEntries.length > 0) {
-                        filteredBookData.push({
-                            book: book,
-                            forceShowAllEntries: bookNameMatches,
-                            filteredEntries: matchingEntries
-                        });
+                        filteredBookData.push({ book, forceShowAllEntries: bookNameMatches, filteredEntries: matchingEntries });
                     }
                 });
             }
@@ -396,9 +434,7 @@
                 let bookNameMatches = !searchTerm || (appState.searchFilters.bookName && bookName.toLowerCase().includes(searchTerm));
                 let matchingEntries = entries.filter(entry => !searchTerm || (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) || (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)));
 
-                if (!bookNameMatches && matchingEntries.length === 0) {
-                    return null;
-                }
+                if (!bookNameMatches && matchingEntries.length === 0) return null;
 
                 const entriesToShow = bookNameMatches ? entries : matchingEntries;
 
@@ -425,26 +461,42 @@
         };
 
         const renderRegexView = (itemList, searchTerm, $container, title) => {
+            const listId = `rlh-regex-list-${title.replace(/\s+/g, '-')}`;
+            const $listContainer = $(`<div id="${listId}" class="rlh-regex-list"></div>`);
+            $container.append($listContainer);
+
             if (!itemList || itemList.length === 0) {
-                $container.html(`<p class="rlh-info-text">没有${title}。点击同步按钮刷新。</p>`);
+                $listContainer.html(`<p class="rlh-info-text">没有${title}。点击同步按钮刷新。</p>`);
                 return;
             }
 
-            let filteredItems = [...itemList].sort((a, b) => b.enabled - a.enabled || (a.script_name || '').localeCompare(b.script_name || ''));
-
+            let filteredItems = [...itemList];
             if (searchTerm) {
                 filteredItems = filteredItems.filter(item => (item.script_name || '').toLowerCase().includes(searchTerm));
             }
 
             if (filteredItems.length === 0) {
-                $container.html(`<p class="rlh-info-text">没有匹配的${title}。</p>`);
+                $listContainer.html(`<p class="rlh-info-text">没有匹配的${title}。</p>`);
                 return;
             }
 
-            filteredItems.forEach(item => $container.append(createItemElement(item, 'regex')));
-        };
+            filteredItems.forEach((item, index) => {
+                const $element = createItemElement(item, 'regex');
+                $element.find('.rlh-item-name').prepend(`<span class="rlh-order-indicator">#${index + 1}</span> `);
+                $listContainer.append($element);
+            });
 
-        
+            const listEl = $listContainer[0];
+            if (listEl && parent.Sortable) {
+                new parent.Sortable(listEl, {
+                    animation: 150,
+                    handle: '.rlh-drag-handle',
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    onEnd: (evt) => handleRegexDragEnd(evt, title === '全局正则' ? 'global' : 'character'),
+                });
+            }
+        };
 
         const createGlobalLorebookElement = (book, searchTerm, forceShowAllEntries, filteredEntries) => {
             const usedByChars = appState.lorebookUsage.get(book.name) || [];
@@ -457,6 +509,7 @@
                     <div class="rlh-global-book-header">
                         <span class="rlh-item-name">${escapeHtml(book.name)}</span>
                         <div class="rlh-item-controls">
+                            <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pencil"></i></button>
                             <button class="rlh-toggle-btn rlh-global-toggle" title="启用/禁用整个世界书"><i class="fa-solid fa-power-off"></i></button>
                             <button class="rlh-action-btn-icon rlh-delete-book-btn" title="删除世界书"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
@@ -489,10 +542,6 @@
                 $content.append(`<div class="rlh-info-text-small">无匹配项</div>`);
             }
 
-            //if (searchTerm && entriesToShow && entriesToShow.length > 0) {
-            //    $content.show();
-            //}
-
             return $element;
         };
 
@@ -503,11 +552,16 @@
             const fromCard = item.source === 'card';
 
             let controlsHtml = '<button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>';
-            if (isLore && !fromCard) {
-                controlsHtml = `<button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>${controlsHtml}<button class="rlh-action-btn-icon rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>`;
+            if (!fromCard) {
+                if (isLore) {
+                    controlsHtml = `<button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>${controlsHtml}<button class="rlh-action-btn-icon rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>`;
+                } else {
+                    controlsHtml = `<button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>${controlsHtml}`;
+                }
             }
             
-            const $element = $(`<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"`: ''}><div class="rlh-item-header" title="${fromCard ? '此条目来自角色卡，部分操作受限' : (appState.multiSelectMode ? '点击选择/取消选择' : '点击展开/编辑')}"><span class="rlh-item-name">${escapeHtml(name)}</span><div class="rlh-item-controls">${controlsHtml}</div></div><div class="rlh-collapsible-content"></div></div>`);
+            const dragHandleHtml = !fromCard && !isLore ? '<span class="rlh-drag-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></span>' : '';
+            const $element = $(`<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"`: ''}><div class="rlh-item-header" title="${fromCard ? '此条目来自角色卡，部分操作受限' : (appState.multiSelectMode ? '点击选择/取消选择' : '点击展开/编辑')}">${dragHandleHtml}<span class="rlh-item-name">${escapeHtml(name)}</span><div class="rlh-item-controls">${controlsHtml}</div></div><div class="rlh-collapsible-content"></div></div>`);
             
             $element.toggleClass('enabled', item.enabled);
 
@@ -605,12 +659,9 @@
         });
 
         const handleMultiSelectHeaderClick = errorCatched(async (event) => {
-            if (!appState.multiSelectMode) {
-                return;
-            }
-            if ($(event.target).closest('.rlh-item-controls').length > 0) {
-                return;
-            }
+            if (!appState.multiSelectMode) return;
+            if ($(event.target).closest('.rlh-item-controls').length > 0) return;
+
             const $header = $(event.currentTarget);
             const $container = $header.closest('.rlh-item-container, .rlh-book-group');
             let itemKey;
@@ -622,12 +673,9 @@
                 const itemType = $container.data('type');
                 const itemId = $container.data('id');
                 const bookName = $container.data('book-name');
-                if (itemType === 'lore') {
-                    itemKey = `lore:${bookName}:${itemId}`;
-                } else {
-                    itemKey = `regex:${itemId}`;
-                }
+                itemKey = (itemType === 'lore') ? `lore:${bookName}:${itemId}` : `regex:${itemId}`;
             }
+
             if (appState.selectedItems.has(itemKey)) {
                 appState.selectedItems.delete(itemKey);
                 $container.removeClass('selected');
@@ -638,39 +686,29 @@
             updateSelectionCount();
         });
 
-        const handleSelectAll = errorCatched(async (event) => {
-            const visibleItems = getAllVisibleItems();
-            visibleItems.forEach(item => {
+        const handleSelectAll = errorCatched(async () => {
+            getAllVisibleItems().forEach(item => {
                 let itemKey;
-                if (item.type === 'book') {
-                    itemKey = `book:${item.id}`;
-                } else if (item.type === 'lore') {
-                    itemKey = `lore:${item.bookName}:${item.id}`;
-                } else {
-                    itemKey = `regex:${item.id}`;
-                }
+                if (item.type === 'book') itemKey = `book:${item.id}`;
+                else if (item.type === 'lore') itemKey = `lore:${item.bookName}:${item.id}`;
+                else itemKey = `regex:${item.id}`;
                 appState.selectedItems.add(itemKey);
             });
             renderContent();
         });
 
-        const handleSelectNone = errorCatched(async (event) => {
+        const handleSelectNone = errorCatched(async () => {
             appState.selectedItems.clear();
             renderContent();
         });
 
-        const handleSelectInvert = errorCatched(async (event) => {
-            const visibleItems = getAllVisibleItems();
+        const handleSelectInvert = errorCatched(async () => {
             const newSelection = new Set();
-            visibleItems.forEach(item => {
+            getAllVisibleItems().forEach(item => {
                 let itemKey;
-                if (item.type === 'book') {
-                    itemKey = `book:${item.id}`;
-                } else if (item.type === 'lore') {
-                    itemKey = `lore:${item.bookName}:${item.id}`;
-                } else {
-                    itemKey = `regex:${item.id}`;
-                }
+                if (item.type === 'book') itemKey = `book:${item.id}`;
+                else if (item.type === 'lore') itemKey = `lore:${item.bookName}:${item.id}`;
+                else itemKey = `regex:${item.id}`;
                 if (!appState.selectedItems.has(itemKey)) {
                     newSelection.add(itemKey);
                 }
@@ -679,22 +717,16 @@
             renderContent();
         });
 
-        const handleBatchEnable = errorCatched(async (event) => {
-            if (appState.selectedItems.size === 0) {
-                await showModal({ type: 'alert', title: '提示', text: '请先选择要启用的项目。' });
-                return;
-            }
+        const handleBatchEnable = errorCatched(async () => {
+            if (appState.selectedItems.size === 0) return await showModal({ type: 'alert', title: '提示', text: '请先选择要启用的项目。' });
             await performBatchOperation(true);
-            showSuccessTick();
+            showSuccessTick("批量启用成功");
         });
 
-        const handleBatchDisable = errorCatched(async (event) => {
-            if (appState.selectedItems.size === 0) {
-                await showModal({ type: 'alert', title: '提示', text: '请先选择要禁用的项目。' });
-                return;
-            }
+        const handleBatchDisable = errorCatched(async () => {
+            if (appState.selectedItems.size === 0) return await showModal({ type: 'alert', title: '提示', text: '请先选择要禁用的项目。' });
             await performBatchOperation(false);
-            showSuccessTick();
+            showSuccessTick("批量禁用成功");
         });
 
         const handleBatchDelete = errorCatched(async () => {
@@ -702,25 +734,17 @@
                 .filter(key => key.startsWith('book:'))
                 .map(key => key.substring(5));
 
-            if (selectedBooks.length === 0) {
-                await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书。' });
-                return;
-            }
+            if (selectedBooks.length === 0) return await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书。' });
 
-            try {
-                await showModal({
-                    type: 'confirm',
-                    title: '确认删除',
-                    text: `您确定要永久删除选中的 ${selectedBooks.length} 本世界书吗？此操作无法撤销。`
-                });
-            } catch {
-                return; // 用户取消
-            }
+            await showModal({
+                type: 'confirm',
+                title: '确认删除',
+                text: `您确定要永久删除选中的 ${selectedBooks.length} 本世界书吗？此操作无法撤销。`
+            });
 
             let deletedCount = 0;
             for (const bookName of selectedBooks) {
-                const success = await TavernAPI.deleteLorebook(bookName);
-                if (success) {
+                if (await TavernAPI.deleteLorebook(bookName)) {
                     deletedCount++;
                     appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
                     appState.lorebookEntries.delete(bookName);
@@ -729,7 +753,7 @@
             }
 
             if (deletedCount > 0) {
-                showSuccessTick();
+                showSuccessTick(`成功删除 ${deletedCount} 本世界书`);
                 renderContent();
             } else {
                 await showModal({ type: 'alert', title: '删除失败', text: '删除世界书时发生错误，请检查控制台。' });
@@ -745,25 +769,18 @@
             
             for (const itemKey of appState.selectedItems) {
                 const [type, ...parts] = itemKey.split(':');
-                if (type === 'book') {
-                    selectedBookNames.add(parts[0]);
-                } else if (type === 'lore') {
+                if (type === 'book') selectedBookNames.add(parts[0]);
+                else if (type === 'lore') {
                     const [bookName, entryId] = parts;
                     if (!selectedEntriesByBook.has(bookName)) selectedEntriesByBook.set(bookName, []);
                     selectedEntriesByBook.get(bookName).push(Number(entryId));
-                } else if (type === 'regex') {
-                    selectedRegexIds.add(parts[0]);
-                }
+                } else if (type === 'regex') selectedRegexIds.add(parts[0]);
             }
 
             if (selectedBookNames.size > 0) {
                 const settings = await TavernAPI.getLorebookSettings();
                 let currentBooks = new Set(settings.selected_global_lorebooks || []);
-                if (enable) {
-                    selectedBookNames.forEach(name => currentBooks.add(name));
-                } else {
-                    selectedBookNames.forEach(name => currentBooks.delete(name));
-                }
+                selectedBookNames.forEach(name => enable ? currentBooks.add(name) : currentBooks.delete(name));
                 await TavernAPI.setLorebookSettings({ selected_global_lorebooks: Array.from(currentBooks) });
                 needsSettingsUpdate = true;
                 selectedBookNames.forEach(name => {
@@ -796,39 +813,27 @@
                 });
                 await TavernAPI.replaceRegexes(allServerRegexes.filter(r => r.source !== 'card'));
                 needsRegexUpdate = true;
-                appState.regexes.global.forEach(r => {
-                    if (selectedRegexIds.has(r.id)) r.enabled = enable;
-                });
-                appState.regexes.character.forEach(r => {
-                    if (selectedRegexIds.has(r.id)) r.enabled = enable;
-                });
+                [appState.regexes.global, appState.regexes.character].forEach(list => 
+                    list.forEach(r => { if (selectedRegexIds.has(r.id)) r.enabled = enable; })
+                );
             }
 
-            if (needsSettingsUpdate || needsRegexUpdate) {
-                await TavernAPI.saveSettings();
-            }
+            if (needsSettingsUpdate || needsRegexUpdate) await TavernAPI.saveSettings();
+            
             appState.selectedItems.clear();
             renderContent();
         });
         
         const handleHeaderClick = errorCatched(async (event) => {
-            if (appState.multiSelectMode || $(event.target).closest('.rlh-item-controls').length > 0 || $(event.currentTarget).closest('.rlh-item-container').hasClass('renaming')) {
-                return;
-            }
+            if (appState.multiSelectMode || $(event.target).closest('.rlh-item-controls').length > 0 || $(event.currentTarget).closest('.rlh-item-container, .rlh-book-group').hasClass('renaming')) return;
             
-            const $header = $(event.currentTarget);
-            const $container = $header.closest('.rlh-item-container, .rlh-book-group');
-            
-            if ($container.hasClass('from-card')) {
-                return;
-            }
+            const $container = $(event.currentTarget).closest('.rlh-item-container, .rlh-book-group');
+            if ($container.hasClass('from-card')) return;
             
             const $content = $container.find('.rlh-collapsible-content').first();
             
             if ($content.is(':visible')) {
-                $content.slideUp(200, () => {
-                    if ($container.is('.rlh-item-container')) $content.empty();
-                });
+                $content.slideUp(200, () => { if ($container.is('.rlh-item-container')) $content.empty(); });
                 return;
             }
             
@@ -905,11 +910,7 @@
                 const bookName = $elementToSort.data('book-name');
                 const settings = await TavernAPI.getLorebookSettings();
                 const currentBooks = new Set(settings.selected_global_lorebooks || []);
-                if (isEnabling) {
-                    currentBooks.add(bookName);
-                } else {
-                    currentBooks.delete(bookName);
-                }
+                if (isEnabling) currentBooks.add(bookName); else currentBooks.delete(bookName);
                 await TavernAPI.setLorebookSettings({ selected_global_lorebooks: Array.from(currentBooks) });
                 await TavernAPI.saveSettings();
                 const bookState = appState.allLorebooks.find(b => b.name === bookName);
@@ -935,10 +936,9 @@
                 }
             }
 
-            showSuccessTick();
+            showSuccessTick(isEnabling ? "已启用" : "已禁用");
             $elementToSort.toggleClass('enabled', isEnabling);
 
-            // Re-sort items in the list
             const items = parentList.children().get();
             items.sort((a, b) => {
                 const aEnabled = $(a).hasClass('enabled');
@@ -1007,17 +1007,77 @@
                     Object.assign(appState.regexes.global.find(r => r.id === id) || appState.regexes.character.find(r => r.id === id), regex);
                 }
             }
-            showSuccessTick();
+            showSuccessTick("保存成功");
         });
         
+        const handleRenameBook = errorCatched(async (event) => {
+            event.stopPropagation();
+            const $bookGroup = $(event.currentTarget).closest('.rlh-book-group');
+            const oldName = $bookGroup.data('book-name');
+            if (!oldName) return;
+
+            let newName;
+            try {
+                newName = await showModal({
+                    type: 'prompt',
+                    title: '重命名世界书',
+                    text: '请输入新的世界书名称：',
+                    value: oldName
+                });
+            } catch {
+                return; // User cancelled
+            }
+
+            newName = newName.trim();
+            if (!newName || newName === oldName) {
+                return;
+            }
+
+            if (appState.allLorebooks.some(b => b.name === newName)) {
+                await showModal({ type: 'alert', title: '重命名失败', text: '该名称的世界书已存在，请选择其他名称。' });
+                return;
+            }
+
+            const $header = $bookGroup.find('.rlh-global-book-header');
+            $header.css('opacity', '0.5');
+
+            const createSuccess = await TavernAPI.createLorebook(newName);
+            if (!createSuccess) {
+                await showModal({ type: 'alert', title: '重命名失败', text: '创建新世界书失败，请检查控制台。' });
+                $header.css('opacity', '1');
+                return;
+            }
+
+            const oldEntries = appState.lorebookEntries.get(oldName) || [];
+            if (oldEntries.length > 0) {
+                const entriesToCreate = oldEntries.map(entry => {
+                    const newEntry = { ...entry };
+                    delete newEntry.uid;
+                    return newEntry;
+                });
+                await TavernAPI.createLorebookEntries(newName, entriesToCreate);
+            }
+
+            const globalSettings = await TavernAPI.getLorebookSettings();
+            if (globalSettings.selected_global_lorebooks && globalSettings.selected_global_lorebooks.includes(oldName)) {
+                const newGlobalBooks = globalSettings.selected_global_lorebooks.map(name => name === oldName ? newName : name);
+                await TavernAPI.setLorebookSettings({ selected_global_lorebooks: newGlobalBooks });
+            }
+            
+            await TavernAPI.deleteLorebook(oldName);
+            await loadAllData(); 
+            showSuccessTick("世界书重命名成功");
+        });
+
         const handleRename = errorCatched(async (event) => {
             event.stopPropagation();
             const $container = $(event.currentTarget).closest('.rlh-item-container');
-            if ($container.hasClass('renaming')) return;
+            if ($container.hasClass('renaming') || $container.length === 0) return;
 
-            const $header = $container.find('.rlh-item-header');
-            const $nameSpan = $header.find('.rlh-item-name');
+            const $header = $container.find('.rlh-item-header').first();
+            const $nameSpan = $header.find('.rlh-item-name').first();
             const oldName = $nameSpan.text().trim();
+            
             const renameUIHtml = `<div class="rlh-rename-ui"><div class="rlh-rename-input-wrapper"><input type="text" class="rlh-rename-input" value="${escapeHtml(oldName)}" /><button class="rlh-action-btn-icon rlh-rename-save-btn" title="确认"><i class="fa-solid fa-check"></i></button><button class="rlh-action-btn-icon rlh-rename-cancel-btn" title="取消"><i class="fa-solid fa-times"></i></button></div></div>`;
             
             $container.addClass('renaming');
@@ -1026,8 +1086,8 @@
         });
 
         const exitRenameMode = ($container, newName = null) => {
-            const $header = $container.find('.rlh-item-header');
-            const $nameSpan = $header.find('.rlh-item-name');
+            const $header = $container.find('.rlh-item-header').first();
+            const $nameSpan = $header.find('.rlh-item-name').first();
             if (newName) {
                 $nameSpan.text(newName);
             }
@@ -1040,24 +1100,34 @@
             const $container = $(event.currentTarget).closest('.rlh-item-container');
             const $input = $container.find('.rlh-rename-input');
             const newName = $input.val().trim();
-            const oldName = $container.find('.rlh-item-name').text().trim();
+            const oldName = $container.find('.rlh-item-name').first().text().trim();
 
             if (!newName || newName === oldName) {
-                exitRenameMode($container);
+                exitRenameMode($container, oldName);
                 return;
             }
-            
-            const id = Number($container.data('id'));
-            const bookName = $container.data('book-name');
-            
-            await TavernAPI.setLorebookEntries(bookName, [{ uid: id, comment: newName }]);
-            const entry = appState.lorebookEntries.get(bookName)?.find(e => e.uid === id);
-            if (entry) {
-                entry.comment = newName;
+
+            const type = $container.data('type');
+            const id = $container.data('id');
+
+            if (type === 'lore') {
+                const bookName = $container.data('book-name');
+                await TavernAPI.setLorebookEntries(bookName, [{ uid: Number(id), comment: newName }]);
+                const entry = appState.lorebookEntries.get(bookName)?.find(e => e.uid === Number(id));
+                if (entry) entry.comment = newName;
+            } else { // type === 'regex'
+                const allServerRegexes = await TavernAPI.getRegexes();
+                const regex = allServerRegexes.find(r => r.id === id);
+                if (regex) {
+                    regex.script_name = newName;
+                    await TavernAPI.replaceRegexes(allServerRegexes.filter(r => r.source !== 'card'));
+                    await TavernAPI.saveSettings();
+                    const localRegex = appState.regexes.global.find(r => r.id === id) || appState.regexes.character.find(r => r.id === id);
+                    if (localRegex) localRegex.script_name = newName;
+                }
             }
-            
             exitRenameMode($container, newName);
-            showSuccessTick();
+            showSuccessTick("重命名成功");
         });
 
         const handleCancelRename = errorCatched(async (event) => {
@@ -1137,7 +1207,7 @@
             const success = await TavernAPI.createLorebook(newName.trim());
             if (success) {
                 await loadAllData();
-                showSuccessTick();
+                showSuccessTick("世界书创建成功");
             } else {
                 await showModal({ type: 'alert', title: '创建失败', text: '创建世界书时发生错误，请检查控制台。' });
             }
@@ -1158,7 +1228,7 @@
                 appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
                 appState.lorebookEntries.delete(bookName);
                 $bookGroup.slideUp(300, () => $bookGroup.remove());
-                showSuccessTick();
+                showSuccessTick("删除成功");
             } else {
                 await showModal({ type: 'alert', title: '删除失败', text: '删除世界书时发生错误，请检查控制台。' });
             }
@@ -1180,7 +1250,7 @@
                         $header.click();
                     }
                 });
-                showSuccessTick();
+                showSuccessTick("新条目已创建");
             } else {
                 await showModal({ type: 'alert', title: '创建失败', text: '创建新条目时发生错误，请检查控制台。' });
             }
@@ -1203,12 +1273,44 @@
             if (result && result.delete_occurred) {
                 appState.lorebookEntries.set(bookName, result.entries);
                 $item.slideUp(300, () => $item.remove());
-                showSuccessTick();
+                showSuccessTick("删除成功");
             } else {
                 await showModal({ type: 'alert', title: '删除失败', text: '删除条目时发生错误，请检查控制台。' });
             }
         });
 
+        const debouncedSaveRegexOrder = debounce(errorCatched(async () => {
+            const allRegexes = [...appState.regexes.global, ...appState.regexes.character];
+            await TavernAPI.replaceRegexes(allRegexes.filter(r => r.source !== 'card'));
+            await TavernAPI.saveSettings();
+            showSuccessTick("正则顺序已保存");
+        }), 800);
+
+        const handleRegexDragEnd = errorCatched(async (evt, scope) => {
+            const { oldIndex, newIndex } = evt;
+            if (oldIndex === newIndex) return;
+
+            const targetList = appState.regexes[scope];
+            const [movedItem] = targetList.splice(oldIndex, 1);
+            targetList.splice(newIndex, 0, movedItem);
+
+            // 乐观更新UI：重新渲染序号
+            renderContent();
+            
+            // 防抖保存
+            debouncedSaveRegexOrder();
+        });
+
+
+        // Debounce function
+        function debounce(func, delay) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
         const handlePositionChange = errorCatched(async (event) => {
             const $select = $(event.currentTarget);
             const $depthContainer = $select.closest('.rlh-editor-grid').find('.rlh-depth-container');
@@ -1251,7 +1353,7 @@
                 $openEditor.find('.rlh-edit-prevent-recursion').prop('checked', true);
             }
             
-            showSuccessTick();
+            showSuccessTick("已为所有条目开启“防止递归”");
         });
 
         const handleFixKeywords = errorCatched(async (event) => {
@@ -1305,14 +1407,31 @@
                     }
                 });
 
-                await showModal({ type: 'alert', title: '操作完成', text: `成功修复了 ${changedCount} 个条目的关键词。` });
-                showSuccessTick();
+                showSuccessTick(`成功修复了 ${changedCount} 个条目的关键词`);
             } else {
                 await showModal({ type: 'alert', title: '提示', text: '所有条目的关键词格式都正确，无需修复。' });
             }
         });
 
         // --- UI 创建与初始化 ---
+        function loadSortableJS(callback) {
+            if (parent.Sortable) {
+                callback();
+                return;
+            }
+            const script = parent.document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js';
+            script.onload = () => {
+                console.log('[RegexLoreHub] SortableJS loaded successfully.');
+                callback();
+            };
+            script.onerror = () => {
+                console.error('[RegexLoreHub] Failed to load SortableJS.');
+                showModal({ type: 'alert', title: '错误', text: '无法加载拖拽排序库，请检查网络连接或浏览器控制台。' });
+            };
+            parent.document.head.appendChild(script);
+        }
+        
         function initializeScript() {
             console.log('[RegexLoreHub] Initializing UI and button...');
             
@@ -1322,24 +1441,26 @@
             }
             
             const styles = `<style id="regex-lore-hub-styles">
-                * { text-shadow: none !important; }
-                :root {
-                    --rlh-border-color: var(--SmartThemeBorderColor, #7EB7D5);
-                    --rlh-text-color: var(--SmartThemeBodyColor, #2C3E50);
-                    --rlh-bg-color: var(--SmartThemeBlurTintColor, #FAF5D5);
-                    --rlh-item-bg: var(--SmartThemeChatTintColor, #DAEEF5);
+                /* 移除全局文本阴影修改，避免影响整个酒馆 */
+                #${PANEL_ID} * { text-shadow: none !important; }
+                /* 限制CSS变量作用域，避免影响全局 */
+                #${PANEL_ID} {
+                    --rlh-border-color: #7EB7D5;
+                    --rlh-text-color: #2C3E50;
+                    --rlh-bg-color: #FAF5D5;
+                    --rlh-item-bg: #000000ff;
                     --rlh-shadow-color: rgba(0,0,0,0.1);
-                    --rlh-header-bg: var(--SmartThemeChatTintColor, #DAEEF5);
+                    --rlh-header-bg: #DAEEF5;
                     --rlh-hover-bg: rgba(126, 183, 213, 0.15);
-                    --rlh-em-color: var(--SmartThemeEmColor, #34495E);
-                    --rlh-accent-color: var(--SmartThemeQuoteColor, #6B9BC2);
+                    --rlh-em-color: #34495E;
+                    --rlh-accent-color: #6B9BC2;
                     --rlh-input-bg: #fff;
                     --rlh-selected-bg: rgba(107, 155, 194, 0.15);
-                    --rlh-selected-border: var(--rlh-accent-color); 
+                    --rlh-selected-border: #6B9BC2;
                     --rlh-green: #28a745; 
                     --rlh-red: #dc3545; 
                     --rlh-green-bg: rgba(40, 167, 69, 0.15); 
-                    --rlh-red-bg: rgba(220, 53, 69, 0.15);
+                    --rlh-red-bg: rgba(220, 53, 69, 0.15);                    
                 }
                 @keyframes fa-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } 
                 .fa-spin { animation: fa-spin 1s infinite linear; } 
@@ -1367,7 +1488,7 @@
                 .rlh-search-controls { display: flex; align-items: center; gap: 8px;} 
                 #${SEARCH_INPUT_ID} {
                     width: 100%; flex-grow: 1; padding: 10px; border: 1px solid var(--rlh-border-color);
-                    border-radius: 8px; box-sizing: border-box; background-color: var(--rlh-input-bg); color: black !important;
+                    border-radius: 8px; box-sizing: border-box; background-color: var(--rlh-input-bg); color: #2C3E50 !important;
                 }
                 #${SEARCH_INPUT_ID}:focus { border-color: var(--rlh-accent-color); box-shadow: 0 0 0 3px var(--rlh-selected-bg); outline: none;} 
                 .rlh-search-action-btn { 
@@ -1451,7 +1572,7 @@
                 .rlh-rename-input-wrapper { position: relative; flex-grow: 1;} 
                 .rlh-rename-input { 
                     width: 100%; height: 100%; box-sizing: border-box; padding: 6px 64px 6px 8px; border-radius: 6px; 
-                    font-weight: 600; color: var(--rlh-text-color); background-color: var(--rlh-input-bg); 
+                    font-weight: 600; color: #2C3E50; background-color: var(--rlh-input-bg); 
                     border: 1px solid var(--rlh-accent-color); box-shadow: 0 0 0 2px var(--rlh-hover-bg); outline: none;
                 } 
                 .rlh-rename-ui .rlh-action-btn-icon { position: absolute; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; font-size: 0.9em;} 
@@ -1478,7 +1599,7 @@
                 .rlh-editor-field input[type=text], .rlh-editor-field textarea, .rlh-editor-field select { 
                     width: 100%; min-height: 80px; resize: vertical; padding: 8px; border-radius: 6px; 
                     border: 1px solid var(--rlh-border-color); box-sizing: border-box; 
-                    background-color: var(--rlh-input-bg); color: var(--rlh-text-color);
+                    background-color: var(--rlh-input-bg); color: #2C3E50;
                 } 
                 .rlh-editor-field input[type=text], .rlh-editor-field select { min-height: auto;} 
                 .rlh-editor-actions { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 15px;} 
@@ -1497,7 +1618,7 @@
                 .rlh-grid-item label { display: block; font-size: 0.9em; font-weight: 500; margin-bottom: 5px; } 
                 .rlh-grid-item input, .rlh-grid-item select { 
                     width: 100%; padding: 8px; border: 1px solid var(--rlh-border-color); border-radius: 6px; 
-                    background-color: var(--rlh-input-bg); color: var(--rlh-text-color); height: 38px; box-sizing: border-box;
+                    background-color: var(--rlh-input-bg); color: #2C3E50; height: 38px; box-sizing: border-box;
                 } 
                 .rlh-depth-container { display: none; } 
                 .rlh-select-nudge { position: relative; top: 4.5px; } 
@@ -1507,31 +1628,73 @@
                 .rlh-depth-inputs { display: flex; gap: 10px;} 
                 .rlh-depth-inputs input[type=number] { 
                     width: 100%; padding: 8px; border: 1px solid var(--rlh-border-color); border-radius: 6px; 
-                    background-color: var(--rlh-input-bg); color: var(--rlh-text-color);
+                    background-color: var(--rlh-input-bg); color: #2C3E50;
                 }
                 .rlh-edit-keys, .rlh-edit-content, .rlh-edit-position, .rlh-select-nudge, .rlh-edit-order, .rlh-edit-probability {
-                    color: black !important;
+                    color: #2C3E50 !important;
+                    background-color: var(--rlh-input-bg) !important;
                 }
-                .rlh-success-indicator {
-                    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                    display: flex; justify-content: center; align-items: center;
-                    z-index: 10002; pointer-events: none;
-                } 
-                .rlh-success-tick { 
-                    width: 60px; height: 60px; border-radius: 50%; display: block; stroke-width: 3; 
-                    stroke-miterlimit: 10; animation: fade-out-slow 0.8s ease-in-out 1.3s forwards;
-                } 
-                .rlh-success-tick-circle { 
-                    stroke-dasharray: 166; stroke-dashoffset: 166; stroke: var(--rlh-green, #28a745); 
-                    animation: stroke-slow 0.8s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-                } 
-                .rlh-success-tick-check { 
-                    transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; 
-                    stroke: var(--rlh-green, #28a745); 
-                    animation: stroke-slow 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.7s forwards;
-                } 
-                @keyframes stroke-slow { 100% { stroke-dashoffset: 0; } } 
-                @keyframes fade-out-slow { 100% { opacity: 0; } } 
+                /* 为浅色主题提供更好的对比度 */
+                .rlh-item-container:not(.enabled) .rlh-item-name {
+                    opacity: 0.6;
+                }
+                .rlh-book-group:not(.enabled) .rlh-item-name {
+                    opacity: 0.6;
+                }
+                /* 正则执行顺序指示器样式 */
+                .rlh-order-indicator {
+                    display: inline-block;
+                    background-color: var(--rlh-accent-color);
+                    color: white;
+                    font-size: 0.75em;
+                    font-weight: bold;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    margin-right: 8px;
+                    min-width: 20px;
+                    text-align: center;
+                }
+               .rlh-drag-handle {
+                   cursor: grab;
+                   color: var(--rlh-em-color);
+                   margin-right: 10px;
+                   padding: 0 5px;
+                   opacity: 0.6;
+                   transition: opacity 0.2s;
+               }
+               .rlh-drag-handle:hover {
+                   opacity: 1;
+               }
+               .rlh-item-container.sortable-ghost {
+                   opacity: 0.4;
+                   background: var(--rlh-selected-bg);
+               }
+               .rlh-item-container.sortable-chosen {
+                   cursor: grabbing;
+               }
+                .rlh-toast-notification, .rlh-progress-toast {
+                   position: absolute;
+                   bottom: 20px;
+                   left: 50%;
+                   transform: translateX(-50%) translateY(10px);
+                   background-color: var(--rlh-green);
+                   color: white;
+                   padding: 10px 20px;
+                   border-radius: 20px;
+                   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                   z-index: 10003;
+                   font-size: 0.9em;
+                   opacity: 0;
+                   transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+                   pointer-events: none;
+               }
+               .rlh-progress-toast {
+                   background-color: var(--rlh-accent-color);
+               }
+               .rlh-toast-notification.visible, .rlh-progress-toast.visible {
+                   opacity: 1;
+                   transform: translateX(-50%) translateY(0);
+               }
                 .rlh-modal-overlay { 
                     position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
                     background: rgba(0, 0, 0, 0.4); z-index: 10001; 
@@ -1547,7 +1710,7 @@
                 .rlh-modal-input { 
                     width: 100%; padding: 8px; border: 1px solid var(--rlh-border-color); border-radius: 4px; 
                     margin-top: 15px; box-sizing: border-box; 
-                    background-color: var(--rlh-input-bg); color: var(--rlh-text-color);
+                    background-color: var(--rlh-input-bg); color: #2C3E50;
                 } 
                 .rlh-modal-input.rlh-input-error { border-color: var(--rlh-red); animation: shake 0.5s;} 
                 .rlh-modal-footer { padding: 10px 15px; border-top: 1px solid var(--rlh-border-color); text-align: right;} 
@@ -1680,6 +1843,7 @@
                 .on('click.rlh', '#rlh-batch-disable-btn', handleBatchDisable)
                 .on('click.rlh', '#rlh-batch-delete-btn', handleBatchDelete)
                 .on('click.rlh', `#${CREATE_LOREBOOK_BTN_ID}`, handleCreateLorebook)
+                .on('click.rlh', '.rlh-rename-book-btn', handleRenameBook)
                 .on('click.rlh', '.rlh-delete-book-btn', handleDeleteLorebook)
                 .on('click.rlh', '.rlh-create-entry-btn', handleCreateEntry)
                 .on('click.rlh', '.rlh-delete-entry-btn', handleDeleteEntry)
@@ -1693,7 +1857,7 @@
             console.log('[RegexLoreHub] All UI and events initialized.');
         }
 
-        initializeScript();
+        loadSortableJS(initializeScript);
     }
 
     onReady(main);
