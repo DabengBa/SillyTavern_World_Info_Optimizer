@@ -425,7 +425,18 @@
             }
 
             const renderBook = (bookName) => {
-                const $bookContainer = $(`<div class="rlh-book-group"><div class="rlh-book-group-header">${escapeHtml(bookName)}</div><div class="rlh-entry-list-wrapper"></div></div>`);
+                const $bookContainer = $(`
+                    <div class="rlh-book-group" data-book-name="${escapeHtml(bookName)}">
+                        <div class="rlh-book-group-header">
+                            <span>${escapeHtml(bookName)}</span>
+                            <div class="rlh-item-controls">
+                                <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pencil"></i></button>
+                                <button class="rlh-action-btn-icon rlh-delete-book-btn" title="删除世界书"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                        <div class="rlh-entry-list-wrapper"></div>
+                    </div>
+                `);
                 const $listWrapper = $bookContainer.find('.rlh-entry-list-wrapper');
                 const $entryActions = $(`<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-shield-halved"></i> 全开防递</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`);
                 $listWrapper.append($entryActions);
@@ -1010,6 +1021,54 @@
             showSuccessTick("保存成功");
         });
         
+        const updateLinkedCharacters = errorCatched(async (oldBookName, newBookName, progressToast) => {
+            const linkedChars = appState.lorebookUsage.get(oldBookName) || [];
+            if (linkedChars.length === 0) return;
+
+            const context = window.parent.SillyTavern.getContext();
+            const originalCharId = context.characterId;
+            let processedCount = 0;
+            const totalCount = linkedChars.length;
+            progressToast.update(`正在更新 ${totalCount} 个关联角色... (0/${totalCount})`);
+
+            for (const charName of linkedChars) {
+                try {
+                    const charIndex = context.characters.findIndex(c => c.name === charName);
+                    if (charIndex === -1) continue;
+
+                    await context.selectCharacterById(charIndex);
+                    
+                    const charBooks = await TavernAPI.getCharLorebooks();
+                    if (!charBooks) continue;
+
+                    let updated = false;
+                    if (charBooks.primary === oldBookName) {
+                        charBooks.primary = newBookName;
+                        updated = true;
+                    }
+                    if (charBooks.additional) {
+                        const index = charBooks.additional.indexOf(oldBookName);
+                        if (index > -1) {
+                            charBooks.additional[index] = newBookName;
+                            updated = true;
+                        }
+                    }
+
+                    if (updated) {
+                        await TavernAPI.setCurrentCharLorebooks(charBooks);
+                    }
+                } catch (charError) {
+                    console.error(`[RegexLoreHub] Failed to update lorebook for character "${charName}":`, charError);
+                }
+                processedCount++;
+                progressToast.update(`正在更新 ${totalCount} 个关联角色... (${processedCount}/${totalCount})`);
+            }
+
+            if (context.characterId !== originalCharId) {
+                await context.selectCharacterById(originalCharId);
+            }
+        });
+        
         const handleRenameBook = errorCatched(async (event) => {
             event.stopPropagation();
             const $bookGroup = $(event.currentTarget).closest('.rlh-book-group');
@@ -1038,35 +1097,63 @@
                 return;
             }
 
-            const $header = $bookGroup.find('.rlh-global-book-header');
-            $header.css('opacity', '0.5');
-
-            const createSuccess = await TavernAPI.createLorebook(newName);
-            if (!createSuccess) {
-                await showModal({ type: 'alert', title: '重命名失败', text: '创建新世界书失败，请检查控制台。' });
-                $header.css('opacity', '1');
-                return;
-            }
-
-            const oldEntries = appState.lorebookEntries.get(oldName) || [];
-            if (oldEntries.length > 0) {
-                const entriesToCreate = oldEntries.map(entry => {
-                    const newEntry = { ...entry };
-                    delete newEntry.uid;
-                    return newEntry;
+            try {
+                await showModal({
+                    type: 'confirm',
+                    title: '确认重命名',
+                    text: `此操作需要临时切换到 ${appState.lorebookUsage.get(oldName)?.length || 0} 个关联角色卡来更新世界书链接，期间请勿操作。是否继续？`
                 });
-                await TavernAPI.createLorebookEntries(newName, entriesToCreate);
+            } catch {
+                return; // User cancelled
             }
 
-            const globalSettings = await TavernAPI.getLorebookSettings();
-            if (globalSettings.selected_global_lorebooks && globalSettings.selected_global_lorebooks.includes(oldName)) {
-                const newGlobalBooks = globalSettings.selected_global_lorebooks.map(name => name === oldName ? newName : name);
-                await TavernAPI.setLorebookSettings({ selected_global_lorebooks: newGlobalBooks });
+            const progressToast = showProgressToast('开始重命名...');
+            try {
+                progressToast.update('正在创建新世界书...');
+                const createSuccess = await TavernAPI.createLorebook(newName);
+                if (!createSuccess) {
+                    throw new Error('创建新世界书文件失败。');
+                }
+
+                const oldEntries = appState.lorebookEntries.get(oldName) || [];
+                if (oldEntries.length > 0) {
+                    progressToast.update('正在复制条目...');
+                    const entriesToCreate = oldEntries.map(entry => {
+                        const newEntry = { ...entry };
+                        delete newEntry.uid;
+                        return newEntry;
+                    });
+                    await TavernAPI.createLorebookEntries(newName, entriesToCreate);
+                }
+
+                await updateLinkedCharacters(oldName, newName, progressToast);
+
+                progressToast.update('正在更新全局设置...');
+                const globalSettings = await TavernAPI.getLorebookSettings();
+                if (globalSettings.selected_global_lorebooks && globalSettings.selected_global_lorebooks.includes(oldName)) {
+                    const newGlobalBooks = globalSettings.selected_global_lorebooks.map(name => name === oldName ? newName : name);
+                    await TavernAPI.setLorebookSettings({ selected_global_lorebooks: newGlobalBooks });
+                }
+                
+                progressToast.update('正在删除旧世界书...');
+                await TavernAPI.deleteLorebook(oldName);
+                
+                progressToast.update('正在刷新数据...');
+                await loadAllData();
+                
+                progressToast.remove();
+                showSuccessTick("世界书重命名成功");
+
+            } catch (error) {
+                progressToast.remove();
+                console.error('[RegexLoreHub] Rename failed:', error);
+                await showModal({ type: 'alert', title: '重命名失败', text: `操作失败: ${error.message}` });
+                // Attempt to clean up the newly created book if rename fails midway
+                if (appState.allLorebooks.some(b => b.name === newName)) {
+                    await TavernAPI.deleteLorebook(newName);
+                }
+                await loadAllData();
             }
-            
-            await TavernAPI.deleteLorebook(oldName);
-            await loadAllData(); 
-            showSuccessTick("世界书重命名成功");
         });
 
         const handleRename = errorCatched(async (event) => {
@@ -1076,7 +1163,7 @@
 
             const $header = $container.find('.rlh-item-header').first();
             const $nameSpan = $header.find('.rlh-item-name').first();
-            const oldName = $nameSpan.text().trim();
+            const oldName = $nameSpan.clone().children().remove().end().text().trim();
             
             const renameUIHtml = `<div class="rlh-rename-ui"><div class="rlh-rename-input-wrapper"><input type="text" class="rlh-rename-input" value="${escapeHtml(oldName)}" /><button class="rlh-action-btn-icon rlh-rename-save-btn" title="确认"><i class="fa-solid fa-check"></i></button><button class="rlh-action-btn-icon rlh-rename-cancel-btn" title="取消"><i class="fa-solid fa-times"></i></button></div></div>`;
             
@@ -1448,14 +1535,11 @@
                     --rlh-border-color: #7EB7D5;
                     --rlh-text-color: #2C3E50;
                     --rlh-bg-color: #FAF5D5;
-                    --rlh-item-bg: #000000ff;
                     --rlh-shadow-color: rgba(0,0,0,0.1);
                     --rlh-header-bg: #DAEEF5;
                     --rlh-hover-bg: rgba(126, 183, 213, 0.15);
                     --rlh-em-color: #34495E;
                     --rlh-accent-color: #6B9BC2;
-                    --rlh-input-bg: #fff;
-                    --rlh-selected-bg: rgba(107, 155, 194, 0.15);
                     --rlh-selected-border: #6B9BC2;
                     --rlh-green: #28a745; 
                     --rlh-red: #dc3545; 
@@ -1517,7 +1601,7 @@
                 .rlh-global-book-header {
                     display: flex; justify-content: space-between; align-items: center; padding: 10px 15px;
                     border: 1px solid var(--rlh-border-color); transition: background-color 0.2s, border-color 0.2s;
-                    cursor: pointer; border-radius: 8px; background-color: var(--rlh-item-bg);
+                    cursor: pointer; border-radius: 8px;
                     flex-wrap: wrap;
                 }
                 .rlh-used-by-chars {
@@ -1537,7 +1621,7 @@
                     margin-bottom: 3px;
                 }
                 .rlh-book-group.enabled .rlh-global-book-header { background-color: var(--rlh-selected-bg); border-color: var(--rlh-accent-color);} 
-                .rlh-item-container { background-color: var(--rlh-item-bg); border: 1px solid var(--rlh-border-color); border-radius: 12px;} 
+                .rlh-item-container {border: 1px solid var(--rlh-border-color); border-radius: 12px;} 
                 .rlh-item-container.from-card { border-color: var(--rlh-accent-color); } 
                 .rlh-item-container.from-card .rlh-item-header { cursor: not-allowed; } 
                 .rlh-item-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; cursor: pointer; position: relative;} 
