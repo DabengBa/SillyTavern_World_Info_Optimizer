@@ -1,5 +1,9 @@
 "use strict";
 
+// Name: Regex & Lorebook Hub
+// Version: 2.5
+// Author: Kilo Code
+
 // 使用IIFE封装，避免全局污染
 (() => {
     console.log('[RegexLoreHub Script] Script execution started.');
@@ -77,6 +81,7 @@
         const appState = {
             regexes: { global: [], character: [] },
             lorebooks: { character: [] },
+            chatLorebook: null, // 新增：用于存储聊天世界书的名称
             allLorebooks: [],
             lorebookEntries: new Map(),
             lorebookUsage: new Map(), // 新增：用于存储世界书 -> 角色的映射
@@ -223,6 +228,9 @@
             replaceRegexes: errorCatched(async (regexes) => await TavernHelper.replaceTavernRegexes(regexes, { scope: 'all' })),
             getLorebookSettings: errorCatched(async () => await TavernHelper.getLorebookSettings()),
             getCharLorebooks: errorCatched(async () => await TavernHelper.getCharLorebooks()),
+            getChatLorebook: errorCatched(async () => await TavernHelper.getChatLorebook()),
+            getOrCreateChatLorebook: errorCatched(async (name) => await TavernHelper.getOrCreateChatLorebook(name)),
+            setChatLorebook: errorCatched(async (name) => await TavernHelper.setChatLorebook(name)),
             getLorebookEntries: errorCatched(async (name) => await TavernHelper.getLorebookEntries(name)),
             setLorebookEntries: errorCatched(async (name, entries) => await TavernHelper.setLorebookEntries(name, entries)),
             createLorebookEntries: errorCatched(async (name, entries) => await TavernHelper.createLorebookEntries(name, entries)),
@@ -235,15 +243,37 @@
             const $content = $(`#${PANEL_ID}-content`, parentDoc);
             $content.html('<p class="rlh-info-text">正在加载所有数据，请稍候...</p>');
 
-            const allCharacters = window.parent.SillyTavern.getContext().characters || [];
+            const context = window.parent.SillyTavern.getContext();
+            const allCharacters = context.characters || [];
+            const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
+            const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
 
-            const [allUIRegexes, charData, globalSettings, charLinkedBooks, allBookFileNames] = await Promise.all([
+            let charData = null, charLinkedBooks = null, chatLorebook = null;
+
+            const promises = [
                 TavernAPI.getRegexes(),
-                TavernAPI.getCharData(),
                 TavernAPI.getLorebookSettings(),
-                TavernAPI.getCharLorebooks(),
-                TavernAPI.getLorebooks()
-            ]);
+                TavernAPI.getLorebooks(),
+            ];
+
+            if (hasActiveCharacter) {
+                promises.push(TavernAPI.getCharData().catch(() => null));
+                promises.push(TavernAPI.getCharLorebooks().catch(() => null));
+            } else {
+                promises.push(Promise.resolve(null), Promise.resolve(null));
+            }
+
+            if (hasActiveChat) {
+                promises.push(TavernAPI.getChatLorebook().catch(() => null));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+
+            const [allUIRegexes, globalSettings, allBookFileNames, resolvedCharData, resolvedCharLinkedBooks, resolvedChatLorebook] = await Promise.all(promises);
+            
+            charData = resolvedCharData;
+            charLinkedBooks = resolvedCharLinkedBooks;
+            chatLorebook = resolvedChatLorebook;
 
             appState.regexes.global = allUIRegexes?.filter(r => r.scope === 'global') || [];
             updateCharacterRegexes(allUIRegexes, charData);
@@ -285,9 +315,13 @@
                 charLinkedBooks.additional.forEach(name => charBookSet.add(name));
             }
             appState.lorebooks.character = Array.from(charBookSet);
-
-            const allBooksToLoad = Array.from(knownBookNames);
-            const existingBookFiles = new Set(allBookFileNames || []);
+            appState.chatLorebook = chatLorebook;
+            if (chatLorebook) {
+                knownBookNames.add(chatLorebook);
+            }
+ 
+             const allBooksToLoad = Array.from(knownBookNames);
+             const existingBookFiles = new Set(allBookFileNames || []);
             await Promise.all(allBooksToLoad.map(async (name) => {
                 if (existingBookFiles.has(name)) {
                     const entries = await TavernAPI.getLorebookEntries(name) || [];
@@ -300,13 +334,15 @@
         });
 
         const refreshCharacterData = errorCatched(async () => {
-            const [charData, charBooks, allUIRegexes] = await Promise.all([
+            const [charData, charBooks, allUIRegexes, chatLorebook] = await Promise.all([
                 TavernAPI.getCharData(),
                 TavernAPI.getCharLorebooks(),
-                TavernAPI.getRegexes()
+                TavernAPI.getRegexes(),
+                TavernAPI.getChatLorebook()
             ]);
             updateCharacterRegexes(allUIRegexes, charData);
             updateCharacterLorebooks(charBooks);
+            appState.chatLorebook = chatLorebook;
             const newBooksToLoad = appState.lorebooks.character.filter(name => !appState.lorebookEntries.has(name));
             if (newBooksToLoad.length > 0) {
                 await Promise.all(newBooksToLoad.map(async (name) => {
@@ -362,7 +398,7 @@
             $content.empty();
             
             $(`#${PANEL_ID}`, parentDoc).toggleClass('rlh-multi-select-mode', appState.multiSelectMode);
-            const isLoreTab = appState.activeTab === 'global-lore' || appState.activeTab === 'char-lore';
+            const isLoreTab = appState.activeTab === 'global-lore' || appState.activeTab === 'char-lore' || appState.activeTab === 'chat-lore';
             $(`#rlh-search-filters-container`, parentDoc).toggle(isLoreTab);
             
             updateSelectionCount();
@@ -373,6 +409,9 @@
                     break;
                 case 'char-lore':
                     renderCharacterLorebookView(searchTerm, $content);
+                    break;
+                case 'chat-lore':
+                    renderChatLorebookView(searchTerm, $content);
                     break;
                 case 'global-regex':
                     renderRegexView(appState.regexes.global, searchTerm, $content, '全局正则');
@@ -419,6 +458,13 @@
 
         const renderCharacterLorebookView = (searchTerm, $container) => {
             const linkedBooks = appState.lorebooks.character;
+            const context = window.parent.SillyTavern.getContext();
+            const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
+
+            if (!hasActiveCharacter) {
+                $container.html(`<p class="rlh-info-text">请先加载一个角色以管理角色世界书。</p>`);
+                return;
+            }
             if (linkedBooks.length === 0) {
                 $container.html(`<p class="rlh-info-text">当前角色没有绑定的世界书。点击同步按钮刷新。</p>`);
                 return;
@@ -471,10 +517,71 @@
             }
         };
 
+        const renderChatLorebookView = (searchTerm, $container) => {
+            const bookName = appState.chatLorebook;
+            const context = window.parent.SillyTavern.getContext();
+            const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+
+            if (!hasActiveChat) {
+                $container.html(`<p class="rlh-info-text">请先打开一个聊天以管理聊天世界书。</p>`);
+                return;
+            }
+
+            if (!bookName) {
+                $container.html(`
+                    <div class="rlh-chat-lore-empty">
+                        <p class="rlh-info-text">当前聊天没有绑定的世界书。</p>
+                        <button class="rlh-action-btn" id="rlh-create-chat-lore-btn"><i class="fa-solid fa-plus"></i> 创建并绑定聊天世界书</button>
+                    </div>
+                `);
+                return;
+            }
+
+            const $bookContainer = $(`
+                <div class="rlh-book-group" data-book-name="${escapeHtml(bookName)}">
+                    <div class="rlh-book-group-header">
+                        <span>${escapeHtml(bookName)} (聊天专用)</span>
+                        <div class="rlh-item-controls">
+                            <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pencil"></i></button>
+                            <button class="rlh-action-btn-icon rlh-unlink-chat-lore-btn" title="解除绑定"><i class="fa-solid fa-unlink"></i></button>
+                        </div>
+                    </div>
+                    <div class="rlh-entry-list-wrapper"></div>
+                </div>
+            `);
+            const $listWrapper = $bookContainer.find('.rlh-entry-list-wrapper');
+            const $entryActions = $(`<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-shield-halved"></i> 全开防递</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`);
+            $listWrapper.append($entryActions);
+
+            let entries = [...(appState.lorebookEntries.get(bookName) || [])].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+            let matchingEntries = entries.filter(entry =>
+                !searchTerm ||
+                (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) ||
+                (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm))
+            );
+
+            if (matchingEntries.length === 0 && searchTerm) {
+                $listWrapper.append(`<p class="rlh-info-text-small">无匹配条目</p>`);
+            } else {
+                matchingEntries.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', bookName)));
+            }
+            
+            $container.empty().append($bookContainer);
+        };
+
         const renderRegexView = (itemList, searchTerm, $container, title) => {
             const listId = `rlh-regex-list-${title.replace(/\s+/g, '-')}`;
             const $listContainer = $(`<div id="${listId}" class="rlh-regex-list"></div>`);
             $container.append($listContainer);
+
+            if (title === '角色正则') {
+                const context = window.parent.SillyTavern.getContext();
+                const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
+                if (!hasActiveCharacter) {
+                    $listContainer.html(`<p class="rlh-info-text">请先加载一个角色以管理角色正则。</p>`);
+                    return;
+                }
+            }
 
             if (!itemList || itemList.length === 0) {
                 $listContainer.html(`<p class="rlh-info-text">没有${title}。点击同步按钮刷新。</p>`);
@@ -520,6 +627,7 @@
                     <div class="rlh-global-book-header">
                         <span class="rlh-item-name">${escapeHtml(book.name)}</span>
                         <div class="rlh-item-controls">
+                            <button class="rlh-action-btn-icon rlh-edit-entries-btn" title="编辑/选择条目"><i class="fa-solid fa-pen-to-square"></i></button>
                             <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pencil"></i></button>
                             <button class="rlh-toggle-btn rlh-global-toggle" title="启用/禁用整个世界书"><i class="fa-solid fa-power-off"></i></button>
                             <button class="rlh-action-btn-icon rlh-delete-book-btn" title="删除世界书"><i class="fa-solid fa-trash-can"></i></button>
@@ -562,12 +670,25 @@
             const name = isLore ? (item.comment || '无标题条目') : (item.script_name || '未命名正则');
             const fromCard = item.source === 'card';
 
-            let controlsHtml = '<button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>';
-            if (!fromCard) {
-                if (isLore) {
-                    controlsHtml = `<button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>${controlsHtml}<button class="rlh-action-btn-icon rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>`;
+            let controlsHtml = '';
+
+            if (isLore) {
+                // 所有世界书条目都有完整的操作按钮
+                controlsHtml = `
+                    <button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>
+                    <button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
+                    <button class="rlh-action-btn-icon rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>
+                `;
+            } else { // 是正则
+                if (fromCard) {
+                    // 来自卡片的正则只有开关
+                    controlsHtml = '<button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>';
                 } else {
-                    controlsHtml = `<button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>${controlsHtml}`;
+                    // UI中的正则有重命名和开关
+                    controlsHtml = `
+                        <button class="rlh-action-btn-icon rlh-rename-btn" title="重命名"><i class="fa-solid fa-pencil"></i></button>
+                        <button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
+                    `;
                 }
             }
             
@@ -741,33 +862,106 @@
         });
 
         const handleBatchDelete = errorCatched(async () => {
-            const selectedBooks = Array.from(appState.selectedItems)
-                .filter(key => key.startsWith('book:'))
-                .map(key => key.substring(5));
+            const selectedBooks = new Set();
+            const selectedEntries = new Map();
+            let totalEntriesToDelete = 0;
 
-            if (selectedBooks.length === 0) return await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书。' });
-
-            await showModal({
-                type: 'confirm',
-                title: '确认删除',
-                text: `您确定要永久删除选中的 ${selectedBooks.length} 本世界书吗？此操作无法撤销。`
-            });
-
-            let deletedCount = 0;
-            for (const bookName of selectedBooks) {
-                if (await TavernAPI.deleteLorebook(bookName)) {
-                    deletedCount++;
-                    appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
-                    appState.lorebookEntries.delete(bookName);
-                    appState.selectedItems.delete(`book:${bookName}`);
+            for (const key of appState.selectedItems) {
+                const [type, ...parts] = key.split(':');
+                if (type === 'book') {
+                    selectedBooks.add(parts[0]);
+                } else if (type === 'lore') {
+                    const [bookName, entryId] = parts;
+                    if (!selectedEntries.has(bookName)) {
+                        selectedEntries.set(bookName, []);
+                    }
+                    selectedEntries.get(bookName).push(Number(entryId));
+                    totalEntriesToDelete++;
                 }
             }
 
-            if (deletedCount > 0) {
-                showSuccessTick(`成功删除 ${deletedCount} 本世界书`);
-                renderContent();
-            } else {
-                await showModal({ type: 'alert', title: '删除失败', text: '删除项目时发生错误，请检查控制台。' });
+            if (selectedBooks.size === 0 && totalEntriesToDelete === 0) {
+                return await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书或条目。' });
+            }
+
+            let confirmText = '您确定要永久删除';
+            const parts = [];
+            if (selectedBooks.size > 0) parts.push(`选中的 ${selectedBooks.size} 本世界书`);
+            if (totalEntriesToDelete > 0) parts.push(`${totalEntriesToDelete} 个条目`);
+            confirmText += ` ${parts.join('和')} 吗？此操作无法撤销。`;
+
+            try {
+                await showModal({ type: 'confirm', title: '确认删除', text: confirmText });
+            } catch {
+                return; // User cancelled
+            }
+
+            const progressToast = showProgressToast('开始删除...');
+            try {
+                let deletedBooksCount = 0;
+                let deletedEntriesCount = 0;
+                let processedEntries = 0;
+                let processedBooks = 0;
+
+                // 先删除条目
+                const entriesToDelete = Array.from(selectedEntries.entries());
+                for (const [bookName, uids] of entriesToDelete) {
+                    if (selectedBooks.has(bookName)) {
+                        processedEntries += uids.length;
+                        continue;
+                    }
+                    
+                    progressToast.update(`正在删除条目... (${processedEntries}/${totalEntriesToDelete})`);
+                    const result = await TavernAPI.deleteLorebookEntries(bookName, uids);
+                    processedEntries += uids.length;
+
+                    if (result && result.delete_occurred) {
+                        deletedEntriesCount += uids.length;
+                        appState.lorebookEntries.set(bookName, result.entries);
+                        uids.forEach(uid => appState.selectedItems.delete(`lore:${bookName}:${uid}`));
+                    }
+                }
+
+                // 再删除整个世界书
+                const booksToDelete = Array.from(selectedBooks);
+                for (const bookName of booksToDelete) {
+                    progressToast.update(`正在删除世界书... (${processedBooks + 1}/${booksToDelete.length})`);
+                    if (await TavernAPI.deleteLorebook(bookName)) {
+                        deletedBooksCount++;
+                        appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
+                        appState.lorebookEntries.delete(bookName);
+                        appState.selectedItems.delete(`book:${bookName}`);
+                        for (const key of appState.selectedItems) {
+                            if (key.startsWith(`lore:${bookName}:`)) {
+                                appState.selectedItems.delete(key);
+                            }
+                        }
+                    }
+                    processedBooks++;
+                }
+
+                progressToast.remove();
+
+                const messageParts = [];
+                if (deletedBooksCount > 0) messageParts.push(`成功删除 ${deletedBooksCount} 本世界书`);
+                if (deletedEntriesCount > 0) messageParts.push(`成功删除 ${deletedEntriesCount} 个条目`);
+
+                if (messageParts.length > 0) {
+                    showSuccessTick(messageParts.join('，'));
+                    // 删除成功后退出多选模式
+                    if (appState.multiSelectMode) {
+                        toggleMultiSelectMode();
+                    } else {
+                        renderContent();
+                    }
+                } else {
+                    await showModal({ type: 'alert', title: '删除失败', text: '删除项目时发生错误，请检查控制台。' });
+                }
+            } catch (error) {
+                progressToast.remove();
+                console.error('[RegexLoreHub] Batch delete failed:', error);
+                await showModal({ type: 'alert', title: '删除失败', text: `操作失败: ${error.message}` });
+                await loadAllData(); // 发生错误时重新加载以同步状态
             }
         });
         
@@ -836,26 +1030,75 @@
         });
         
         const handleHeaderClick = errorCatched(async (event) => {
-            if (appState.multiSelectMode || $(event.target).closest('.rlh-item-controls').length > 0 || $(event.currentTarget).closest('.rlh-item-container, .rlh-book-group').hasClass('renaming')) return;
-            
+            const $target = $(event.target);
             const $container = $(event.currentTarget).closest('.rlh-item-container, .rlh-book-group');
-            if ($container.hasClass('from-card')) return;
+
+            // 如果点击的是按钮等可交互控件，则不执行后续逻辑
+            if ($target.closest('.rlh-item-controls, .rlh-rename-ui').length > 0) {
+                return;
+            }
+
+            // 如果处于多选模式
+            if (appState.multiSelectMode) {
+                let itemKey;
+                const isGlobalLoreTab = appState.activeTab === 'global-lore';
+                const isBookHeader = $container.hasClass('rlh-book-group');
+
+                if (isGlobalLoreTab && isBookHeader) {
+                    // **全局世界书页面的特殊逻辑**
+                    const isEditingEntries = $container.hasClass('editing-entries');
+                    if (!isEditingEntries) {
+                        // 只有在非编辑模式下才能选择书本本身
+                        const bookName = $container.data('book-name');
+                        itemKey = `book:${bookName}`;
+                    }
+                } else if ($container.hasClass('rlh-item-container')) {
+                    // **适用于所有页面中的条目 (item) 的通用逻辑**
+                    const canSelectItem = isGlobalLoreTab ? $container.closest('.rlh-book-group').hasClass('editing-entries') : true;
+                    
+                    if (canSelectItem) {
+                        const itemType = $container.data('type');
+                        const itemId = $container.data('id');
+                        if (itemType === 'lore') {
+                            const bookName = $container.data('book-name');
+                            itemKey = `lore:${bookName}:${itemId}`;
+                        } else if (itemType === 'regex') {
+                            itemKey = `regex:${itemId}`;
+                        }
+                    }
+                }
+
+                if (itemKey) {
+                    if (appState.selectedItems.has(itemKey)) {
+                        appState.selectedItems.delete(itemKey);
+                        $container.removeClass('selected');
+                    } else {
+                        appState.selectedItems.add(itemKey);
+                        $container.addClass('selected');
+                    }
+                    updateSelectionCount();
+                }
+                return; // 多选模式下不执行后续的单选展开逻辑
+            }
+
+            // --- 以下是单选模式下的展开/折叠逻辑 ---
+            if ($container.hasClass('from-card') || $container.hasClass('renaming')) return;
             
             const $content = $container.find('.rlh-collapsible-content').first();
             
-            if ($content.is(':visible')) {
-                $content.slideUp(200, () => { if ($container.is('.rlh-item-container')) $content.empty(); });
-                return;
-            }
-            
-            if ($container.is('.rlh-item-container')) {
-                $container.siblings('.rlh-item-container').find('.rlh-collapsible-content:visible').slideUp(200).empty();
-            }
-            
+            // 对于世界书组，总是展开/折叠
             if ($container.is('.rlh-book-group')) {
                 $content.slideToggle(200);
                 return;
             }
+
+            // 对于条目，展开/折叠编辑器
+            if ($content.is(':visible')) {
+                $content.slideUp(200, () => $content.empty());
+                return;
+            }
+            
+            $container.siblings('.rlh-item-container').find('.rlh-collapsible-content:visible').slideUp(200).empty();
 
             const type = $container.data('type');
             const id = $container.data('id');
@@ -906,6 +1149,41 @@
             $content.html(fullEditorHtml).slideDown(200, () => {
                 $content.find('.rlh-edit-position').trigger('change');
             });
+        });
+        
+        const handleEditEntriesToggle = errorCatched(async (event) => {
+            event.stopPropagation();
+            const $button = $(event.currentTarget);
+            const $bookGroup = $button.closest('.rlh-book-group');
+            const isEnteringEditMode = !$bookGroup.hasClass('editing-entries');
+
+            // 切换编辑状态
+            $bookGroup.toggleClass('editing-entries');
+
+            if (isEnteringEditMode) {
+                // **进入** 编辑模式
+                // 1. 如果多选未激活，则自动激活并更新相关UI
+                if (!appState.multiSelectMode) {
+                    appState.multiSelectMode = true;
+                    $(`#rlh-multi-select-btn`, parentDoc).addClass('active');
+                    $(`#rlh-multi-select-controls`, parentDoc).addClass('active');
+                    // 手动为所有可见项目添加多选模式的class，而不是重绘整个面板
+                    $(`#${PANEL_ID}`, parentDoc).addClass('rlh-multi-select-mode');
+                }
+                
+                // 2. 强制展开内容
+                $bookGroup.find('.rlh-collapsible-content').first().slideDown(200);
+                
+                // 3. 更新按钮状态
+                $button.attr('title', '完成编辑').find('i').removeClass('fa-pen-to-square').addClass('fa-check-square');
+                $button.addClass('active');
+
+            } else {
+                // **退出** 编辑模式
+                // 1. 仅更新按钮状态
+                $button.attr('title', '编辑/选择条目').find('i').removeClass('fa-check-square').addClass('fa-pen-to-square');
+                $button.removeClass('active');
+            }
         });
         
         const handleToggleState = errorCatched(async (event) => {
@@ -1133,6 +1411,11 @@
                 if (globalSettings.selected_global_lorebooks && globalSettings.selected_global_lorebooks.includes(oldName)) {
                     const newGlobalBooks = globalSettings.selected_global_lorebooks.map(name => name === oldName ? newName : name);
                     await TavernAPI.setLorebookSettings({ selected_global_lorebooks: newGlobalBooks });
+                }
+
+                if (appState.chatLorebook === oldName) {
+                   progressToast.update('正在更新聊天绑定...');
+                   await TavernAPI.setChatLorebook(newName);
                 }
                 
                 progressToast.update('正在删除旧世界书...');
@@ -1500,6 +1783,32 @@
             }
         });
 
+        const handleCreateChatLorebook = errorCatched(async () => {
+            const bookName = await TavernAPI.getOrCreateChatLorebook();
+            if (bookName) {
+                showSuccessTick(`已创建并绑定聊天世界书: ${bookName}`);
+                await loadAllData();
+            } else {
+                await showModal({ type: 'alert', title: '操作失败', text: '无法创建或绑定聊天世界书，请检查控制台。' });
+            }
+        });
+
+        const handleUnlinkChatLorebook = errorCatched(async () => {
+            const bookName = appState.chatLorebook;
+            if (!bookName) return;
+
+            try {
+                await showModal({ type: 'confirm', title: '确认解除绑定', text: `您确定要解除与聊天世界书 "${bookName}" 的绑定吗？世界书本身不会被删除。` });
+            } catch {
+                return; // 用户取消
+            }
+
+            await TavernAPI.setChatLorebook(null);
+            appState.chatLorebook = null;
+            showSuccessTick("已解除绑定");
+            renderContent();
+        });
+
         // --- UI 创建与初始化 ---
         function loadSortableJS(callback) {
             if (parent.Sortable) {
@@ -1647,12 +1956,22 @@
                 .rlh-multi-select-mode .rlh-item-header { position: relative; cursor: pointer; transition: background-color 0.2s;} 
                 .rlh-multi-select-mode .rlh-global-book-header { position: relative; cursor: pointer; transition: background-color 0.2s;} 
                 .rlh-multi-select-mode .rlh-item-header:hover { background-color: var(--rlh-hover-bg);} 
-                .rlh-multi-select-mode .rlh-global-book-header:hover { background-color: var(--rlh-hover-bg);} 
-                .rlh-multi-select-mode .rlh-item-container.selected, .rlh-multi-select-mode .rlh-book-group.selected { background-color: var(--rlh-selected-bg); border-color: var(--rlh-selected-border); box-shadow: 0 0 0 1px var(--rlh-selected-border);} 
-                .rlh-multi-select-mode .rlh-item-name { user-select: none;} 
-                .rlh-item-container, .rlh-book-group { transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;} 
-                .rlh-item-header, .rlh-global-book-header { transition: cursor 0.2s;} 
-                .rlh-rename-ui { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; background-color: var(--rlh-bg-color); padding: 6px 15px;} 
+                .rlh-multi-select-mode .rlh-global-book-header:hover { background-color: var(--rlh-hover-bg);}
+                .rlh-multi-select-mode .rlh-item-container.selected, .rlh-multi-select-mode .rlh-book-group.selected .rlh-global-book-header {
+                    border-color: #FF8C00; /* 亮橙色 */
+                    box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.5);
+                }
+                .rlh-multi-select-mode .rlh-item-name { user-select: none;}
+                .rlh-book-group.editing-entries > .rlh-global-book-header {
+                    background-color: var(--rlh-hover-bg);
+                }
+                .rlh-edit-entries-btn.active {
+                    color: var(--rlh-green);
+                    background-color: var(--rlh-green-bg);
+                }
+                .rlh-item-container, .rlh-book-group { transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;}
+                .rlh-item-header, .rlh-global-book-header { transition: cursor 0.2s;}
+                .rlh-rename-ui { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; background-color: var(--rlh-bg-color); padding: 6px 15px;}
                 .rlh-rename-input-wrapper { position: relative; flex-grow: 1;} 
                 .rlh-rename-input { 
                     width: 100%; height: 100%; box-sizing: border-box; padding: 6px 64px 6px 8px; border-radius: 6px; 
@@ -1860,6 +2179,7 @@
                 <div class="rlh-tab-nav">
                     <div class="rlh-tab active" data-tab="global-lore"><span class="rlh-tab-text-full">全局世界书</span><span class="rlh-tab-text-short">全局书</span></div>
                     <div class="rlh-tab" data-tab="char-lore"><span class="rlh-tab-text-full">角色世界书</span><span class="rlh-tab-text-short">角色书</span></div>
+                    <div class="rlh-tab" data-tab="chat-lore"><span class="rlh-tab-text-full">聊天世界书</span><span class="rlh-tab-text-short">聊天书</span></div>
                     <div class="rlh-tab" data-tab="global-regex"><span class="rlh-tab-text-full">全局正则</span><span class="rlh-tab-text-short">全局正则</span></div>
                     <div class="rlh-tab" data-tab="char-regex"><span class="rlh-tab-text-full">角色正则</span><span class="rlh-tab-text-short">角色正则</span></div>
                     
@@ -1910,7 +2230,6 @@
                 .on('click.rlh', '.rlh-close-button', togglePanel)
                 .on('click.rlh', '.rlh-tab', switchTab)
                 .on('click.rlh', '.rlh-item-header, .rlh-global-book-header', handleHeaderClick)
-                .on('click.rlh', '.rlh-item-header, .rlh-global-book-header', handleMultiSelectHeaderClick)
                 .on('click.rlh', '.rlh-toggle-btn', handleToggleState)
                 .on('click.rlh', '.rlh-save-btn', handleSave)
                 .on('click.rlh', '.rlh-maximize-btn', handleEditorExpandToggle)
@@ -1928,6 +2247,7 @@
                 .on('click.rlh', '#rlh-batch-delete-btn', handleBatchDelete)
                 .on('click.rlh', `#${CREATE_LOREBOOK_BTN_ID}`, handleCreateLorebook)
                 .on('click.rlh', '.rlh-rename-book-btn', handleRenameBook)
+                .on('click.rlh', '.rlh-edit-entries-btn', handleEditEntriesToggle)
                 .on('click.rlh', '.rlh-delete-book-btn', handleDeleteLorebook)
                 .on('click.rlh', '.rlh-create-entry-btn', handleCreateEntry)
                 .on('click.rlh', '.rlh-delete-entry-btn', handleDeleteEntry)
@@ -1937,7 +2257,9 @@
                 .on('click.rlh', '.rlh-rename-save-btn', handleConfirmRename)
                 .on('click.rlh', '.rlh-rename-cancel-btn', handleCancelRename)
                 .on('keydown.rlh', '.rlh-rename-input', handleRenameKeydown)
-                .on('change.rlh', '.rlh-edit-position', handlePositionChange);
+                .on('change.rlh', '.rlh-edit-position', handlePositionChange)
+                .on('click.rlh', '#rlh-create-chat-lore-btn', handleCreateChatLorebook)
+                .on('click.rlh', '.rlh-unlink-chat-lore-btn', handleUnlinkChatLorebook);
             console.log('[RegexLoreHub] All UI and events initialized.');
         }
 
