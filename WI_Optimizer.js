@@ -1,7 +1,7 @@
 "use strict";
 
 // Name: Regex & Lorebook Hub
-// Version: 2.5
+// Version: 2.6
 // Author: Kilo Code
 
 // 使用IIFE封装，避免全局污染
@@ -864,6 +864,7 @@
         const handleBatchDelete = errorCatched(async () => {
             const selectedBooks = new Set();
             const selectedEntries = new Map();
+            const selectedRegexIds = new Set();
             let totalEntriesToDelete = 0;
 
             for (const key of appState.selectedItems) {
@@ -877,17 +878,20 @@
                     }
                     selectedEntries.get(bookName).push(Number(entryId));
                     totalEntriesToDelete++;
+                } else if (type === 'regex') {
+                    selectedRegexIds.add(parts[0]);
                 }
             }
 
-            if (selectedBooks.size === 0 && totalEntriesToDelete === 0) {
-                return await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的世界书或条目。' });
+            if (selectedBooks.size === 0 && totalEntriesToDelete === 0 && selectedRegexIds.size === 0) {
+                return await showModal({ type: 'alert', title: '提示', text: '请先选择要删除的项目。' });
             }
 
             let confirmText = '您确定要永久删除';
             const parts = [];
             if (selectedBooks.size > 0) parts.push(`选中的 ${selectedBooks.size} 本世界书`);
             if (totalEntriesToDelete > 0) parts.push(`${totalEntriesToDelete} 个条目`);
+            if (selectedRegexIds.size > 0) parts.push(`${selectedRegexIds.size} 个正则`);
             confirmText += ` ${parts.join('和')} 吗？此操作无法撤销。`;
 
             try {
@@ -900,6 +904,7 @@
             try {
                 let deletedBooksCount = 0;
                 let deletedEntriesCount = 0;
+                let deletedRegexCount = 0;
                 let processedEntries = 0;
                 let processedBooks = 0;
 
@@ -940,11 +945,30 @@
                     processedBooks++;
                 }
 
+                // 新增：删除正则表达式
+                if (selectedRegexIds.size > 0) {
+                    progressToast.update(`正在删除 ${selectedRegexIds.size} 个正则...`);
+                    const allServerRegexes = await TavernAPI.getRegexes();
+                    const regexesToKeep = allServerRegexes.filter(r => !selectedRegexIds.has(r.id));
+                    
+                    // 只替换非卡片内正则
+                    await TavernAPI.replaceRegexes(regexesToKeep.filter(r => r.source !== 'card'));
+                    await TavernAPI.saveSettings();
+
+                    deletedRegexCount = allServerRegexes.length - regexesToKeep.length;
+
+                    // 更新本地状态
+                    appState.regexes.global = appState.regexes.global.filter(r => !selectedRegexIds.has(r.id));
+                    appState.regexes.character = appState.regexes.character.filter(r => !selectedRegexIds.has(r.id));
+                    selectedRegexIds.forEach(id => appState.selectedItems.delete(`regex:${id}`));
+                }
+
                 progressToast.remove();
 
                 const messageParts = [];
                 if (deletedBooksCount > 0) messageParts.push(`成功删除 ${deletedBooksCount} 本世界书`);
                 if (deletedEntriesCount > 0) messageParts.push(`成功删除 ${deletedEntriesCount} 个条目`);
+                if (deletedRegexCount > 0) messageParts.push(`成功删除 ${deletedRegexCount} 个正则`);
 
                 if (messageParts.length > 0) {
                     showSuccessTick(messageParts.join('，'));
