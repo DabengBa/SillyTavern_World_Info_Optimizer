@@ -1,0 +1,14 @@
+# Exclude Archive folder and TODO.txt from language statistics
+Archive/* linguist-vendored
+TODO.txt linguist-documentation
+
+# Exclude TypeScript type definition files
+@types/
+
+# Additional common ignores
+node_modules/
+*.log
+.DS_Store
+.vscode/
+*.tmp
+*.temp
