@@ -2,7 +2,6 @@
 
 // Name: Regex & Lorebook Hub
 // Version: 2.6
-// Author: Kilo Code
 
 // 使用IIFE封装，避免全局污染
 (() => {
@@ -87,7 +86,7 @@
             lorebookUsage: new Map(), // 新增：用于存储世界书 -> 角色的映射
             activeTab: 'global-lore',
             isDataLoaded: false,
-            searchFilters: { bookName: true, entryName: true, keywords: true },
+            searchFilters: { bookName: true, entryName: true, keywords: true, content: true },
             multiSelectMode: false,
             selectedItems: new Set(),
         };
@@ -110,6 +109,19 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        };
+
+        // 高亮搜索匹配的文本
+        const highlightText = (text, searchTerm) => {
+            if (!searchTerm || !text) return escapeHtml(text);
+            
+            // 转义搜索词中的特殊字符
+            const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+            
+            // 先转义HTML，然后进行高亮处理
+            const escapedText = escapeHtml(text);
+            return escapedText.replace(regex, '<mark class="rlh-highlight">$1</mark>');
         };
 
         const showSuccessTick = (message = '操作成功', duration = 1500) => {
@@ -393,6 +405,7 @@
             appState.searchFilters.bookName = $(`#rlh-filter-book-name`, parentDoc).is(':checked');
             appState.searchFilters.entryName = $(`#rlh-filter-entry-name`, parentDoc).is(':checked');
             appState.searchFilters.keywords = $(`#rlh-filter-keywords`, parentDoc).is(':checked');
+            appState.searchFilters.content = $(`#rlh-filter-content`, parentDoc).is(':checked');
             
             const $content = $(`#${PANEL_ID}-content`, parentDoc);
             $content.empty();
@@ -434,7 +447,8 @@
                     let bookNameMatches = appState.searchFilters.bookName && book.name.toLowerCase().includes(searchTerm);
                     let matchingEntries = entries.filter(entry =>
                         (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) ||
-                        (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm))
+                        (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)) ||
+                        (appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm))
                     );
 
                     if (bookNameMatches || matchingEntries.length > 0) {
@@ -489,17 +503,17 @@
                 
                 let entries = [...(appState.lorebookEntries.get(bookName) || [])].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
                 let bookNameMatches = !searchTerm || (appState.searchFilters.bookName && bookName.toLowerCase().includes(searchTerm));
-                let matchingEntries = entries.filter(entry => !searchTerm || (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) || (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)));
+                let matchingEntries = entries.filter(entry => !searchTerm || (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) || (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)) || (appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm)));
 
                 if (!bookNameMatches && matchingEntries.length === 0) return null;
 
                 const entriesToShow = bookNameMatches ? entries : matchingEntries;
 
                 if (entriesToShow.length === 0 && searchTerm) {
-                    $listWrapper.append(`<p class="rlh-info-text-small">无匹配条目</p>`);
-                } else {
-                    entriesToShow.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', bookName)));
-                }
+                            $listWrapper.append(`<p class="rlh-info-text-small">无匹配条目</p>`);
+                        } else {
+                            entriesToShow.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', bookName, searchTerm)));
+                        }
                 return $bookContainer;
             };
 
@@ -557,13 +571,14 @@
             let matchingEntries = entries.filter(entry =>
                 !searchTerm ||
                 (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) ||
-                (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm))
+                (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)) ||
+                (appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm))
             );
 
             if (matchingEntries.length === 0 && searchTerm) {
                 $listWrapper.append(`<p class="rlh-info-text-small">无匹配条目</p>`);
             } else {
-                matchingEntries.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', bookName)));
+                matchingEntries.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', bookName, searchTerm)));
             }
             
             $container.empty().append($bookContainer);
@@ -622,10 +637,13 @@
                 ? `<div class="rlh-used-by-chars">使用者: ${usedByChars.map(char => `<span>${escapeHtml(char)}</span>`).join(', ')}</div>`
                 : '';
 
+            // 应用高亮到世界书名称
+            const highlightedBookName = highlightText(book.name, searchTerm);
+
             const $element = $(`
                 <div class="rlh-book-group" data-book-name="${escapeHtml(book.name)}">
                     <div class="rlh-global-book-header">
-                        <span class="rlh-item-name">${escapeHtml(book.name)}</span>
+                        <span class="rlh-item-name">${highlightedBookName}</span>
                         <div class="rlh-item-controls">
                             <button class="rlh-action-btn-icon rlh-edit-entries-btn" title="编辑/选择条目"><i class="fa-solid fa-pen-to-square"></i></button>
                             <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pencil"></i></button>
@@ -655,7 +673,7 @@
 
             if (entriesToShow && entriesToShow.length > 0) {
                 const $listWrapper = $('<div class="rlh-entry-list-wrapper"></div>');
-                entriesToShow.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', book.name)));
+                entriesToShow.forEach(entry => $listWrapper.append(createItemElement(entry, 'lore', book.name, searchTerm)));
                 $content.append($listWrapper);
             } else if (searchTerm) {
                 $content.append(`<div class="rlh-info-text-small">无匹配项</div>`);
@@ -664,7 +682,7 @@
             return $element;
         };
 
-        const createItemElement = (item, type, bookName = '') => {
+        const createItemElement = (item, type, bookName = '', searchTerm = '') => {
             const isLore = type === 'lore';
             const id = isLore ? item.uid : item.id;
             const name = isLore ? (item.comment || '无标题条目') : (item.script_name || '未命名正则');
@@ -693,7 +711,14 @@
             }
             
             const dragHandleHtml = !fromCard && !isLore ? '<span class="rlh-drag-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></span>' : '';
-            const $element = $(`<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"`: ''}><div class="rlh-item-header" title="${fromCard ? '此条目来自角色卡，部分操作受限' : (appState.multiSelectMode ? '点击选择/取消选择' : '点击展开/编辑')}">${dragHandleHtml}<span class="rlh-item-name">${escapeHtml(name)}</span><div class="rlh-item-controls">${controlsHtml}</div></div><div class="rlh-collapsible-content"></div></div>`);
+            
+            // 应用高亮到条目名称
+            const highlightedName = highlightText(name, searchTerm);
+            
+            const $element = $(`<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"`: ''}><div class="rlh-item-header" title="${fromCard ? '此条目来自角色卡，部分操作受限' : (appState.multiSelectMode ? '点击选择/取消选择' : '点击展开/编辑')}">${dragHandleHtml}<span class="rlh-item-name">${highlightedName}</span><div class="rlh-item-controls">${controlsHtml}</div></div><div class="rlh-collapsible-content"></div></div>`);
+            
+            // 保存搜索词以便在内容展开时使用
+            $element.data('searchTerm', searchTerm);
             
             $element.toggleClass('enabled', item.enabled);
 
@@ -1136,9 +1161,13 @@
                 const positionOptions = Object.entries(LOREBOOK_OPTIONS.position).map(([value, text]) => `<option value="${value}" ${item.position === value ? 'selected' : ''}>${text}</option>`).join('');
                 const logicOptions = Object.entries(LOREBOOK_OPTIONS.logic).map(([value, text]) => `<option value="${value}" ${item.logic === value ? 'selected' : ''}>${text}</option>`).join('');
 
+                // 获取搜索词以用于内容高亮
+                const searchTerm = $container.data('searchTerm') || '';
+                const highlightedContent = searchTerm ? highlightText(item.content || '', searchTerm) : escapeHtml(item.content || '');
+
                 editorHtml = `
-                    <div class="rlh-editor-field"><label>关键词 (逗号分隔)</label><input type="text" class="rlh-edit-keys" value="${escapeHtml((item.keys || []).join(', '))}"><\/div>
-                    <div class="rlh-editor-field"><label>内容<\/label><textarea class="rlh-edit-content">${escapeHtml(item.content || '')}<\/textarea><\/div>
+                    <div class="rlh-editor-field"><label>关键词 (逗号分隔)</label><input type="text" class="rlh-edit-keys" value="${escapeHtml((item.keys || []).join(', '))}"></div>
+                    <div class="rlh-editor-field"><label>内容</label><div class="rlh-edit-content" contenteditable="true" style="min-height: 80px; padding: 8px; border-radius: 6px; border: 1px solid var(--rlh-border-color); box-sizing: border-box; background-color: var(--rlh-input-bg); color: #2C3E50;">${highlightedContent}</div></div>
                     <div class="rlh-editor-group"><h5>插入规则</h5>
                         <div class="rlh-editor-grid">
                             <div class="rlh-grid-item"><label>位置</label><select class="rlh-edit-position rlh-select-nudge">${positionOptions}</select></div>
@@ -1273,7 +1302,7 @@
                 const bookName = $container.data('book-name');
                 const updatedEntry = { uid: Number(id) };
                 updatedEntry.keys = $container.find('.rlh-edit-keys').val().split(',').map(k => k.trim()).filter(Boolean);
-                updatedEntry.content = $container.find('.rlh-edit-content').val();
+                updatedEntry.content = $container.find('.rlh-edit-content').text();
                 updatedEntry.position = $container.find('.rlh-edit-position').val();
                 
                 const depthVal = parseInt($container.find('.rlh-edit-depth').val(), 10);
@@ -2099,6 +2128,14 @@
                .rlh-item-container.sortable-chosen {
                    cursor: grabbing;
                }
+               /* 搜索关键词高亮样式 */
+               .rlh-highlight {
+                   background-color: #ffeb3b;
+                   color: #000;
+                   padding: 1px 3px;
+                   border-radius: 3px;
+                   font-weight: bold;
+               }
                 .rlh-toast-notification, .rlh-progress-toast {
                    position: absolute;
                    bottom: 20px;
@@ -2221,6 +2258,7 @@
                         <label class="rlh-filter-item"><input type="checkbox" id="rlh-filter-book-name" checked>世界书名</label>
                         <label class="rlh-filter-item"><input type="checkbox" id="rlh-filter-entry-name" checked>条目名</label>
                         <label class="rlh-filter-item"><input type="checkbox" id="rlh-filter-keywords" checked>关键词</label>
+                        <label class="rlh-filter-item"><input type="checkbox" id="rlh-filter-content" checked>内容</label>
                     </div>
                     <div id="rlh-multi-select-controls" class="rlh-multi-select-controls">
                         <div class="rlh-multi-select-actions">
