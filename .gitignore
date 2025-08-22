@@ -8,3 +8,4 @@ node_modules/
 .vscode/
 *.tmp
 *.temp
+debug_chat_lorebook.html
