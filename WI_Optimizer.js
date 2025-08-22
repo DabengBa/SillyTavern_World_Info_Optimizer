@@ -1642,9 +1642,16 @@
                 // 获取搜索词以用于内容高亮
                 const searchTerm = $container.data('searchTerm') || '';
                 const highlightedContent = searchTerm ? highlightText(item.content || '', searchTerm) : escapeHtml(item.content || '');
+                // 为关键词字段也添加高亮处理
+                const keywordsText = (item.keys || []).join(', ');
+                const highlightedKeywords = searchTerm ? highlightText(keywordsText, searchTerm) : escapeHtml(keywordsText);
 
                 editorHtml = `
-                    <div class="rlh-editor-field"><label>关键词 (逗号分隔)</label><input type="text" class="rlh-edit-keys" value="${escapeHtml((item.keys || []).join(', '))}"></div>
+                    <div class="rlh-editor-field">
+                        <label>关键词 (逗号分隔)</label>
+                        <div class="rlh-keywords-display" style="min-height: 20px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rlh-border-color); background-color: var(--rlh-input-bg); margin-bottom: 4px; font-size: 14px; line-height: 1.4;">${highlightedKeywords}</div>
+                        <input type="text" class="rlh-edit-keys" value="${escapeHtml(keywordsText)}">
+                    </div>
                     <div class="rlh-editor-field"><label>内容</label><div class="rlh-edit-content" contenteditable="true" style="min-height: 80px; padding: 8px; border-radius: 6px; border: 1px solid var(--rlh-border-color); box-sizing: border-box; background-color: var(--rlh-input-bg); color: #2C3E50;">${highlightedContent}</div></div>
                     <div class="rlh-editor-group"><h5>插入规则</h5>
                         <div class="rlh-editor-grid">
