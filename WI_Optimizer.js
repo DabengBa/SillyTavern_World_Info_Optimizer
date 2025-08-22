@@ -425,7 +425,11 @@
                 }
 
                 if (hasActiveChat) {
-                    promises.push(TavernAPI.getChatLorebook().catch(() => null));
+                    // 只有在确实有活跃聊天时才尝试获取聊天世界书
+                    promises.push(TavernAPI.getChatLorebook().catch((error) => {
+                        console.warn('[RegexLoreHub] Failed to get chat lorebook:', error);
+                        return null;
+                    }));
                 } else {
                     promises.push(Promise.resolve(null));
                 }
@@ -560,12 +564,28 @@
         });
 
         const refreshCharacterData = errorCatched(async () => {
-            const [charData, charBooks, allUIRegexes, chatLorebook] = await Promise.all([
+            // 检查是否有活跃的聊天
+            const context = window.parent.SillyTavern.getContext() || {};
+            const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+            
+            const promises = [
                 TavernAPI.getCharData(),
                 TavernAPI.getCurrentCharLorebooks(),
-                TavernAPI.getRegexes(),
-                TavernAPI.getChatLorebook()
-            ]);
+                TavernAPI.getRegexes()
+            ];
+            
+            // 只有在有活跃聊天时才获取聊天世界书
+            if (hasActiveChat) {
+                promises.push(TavernAPI.getChatLorebook().catch((error) => {
+                    console.warn('[RegexLoreHub] Failed to get chat lorebook in refreshCharacterData:', error);
+                    return null;
+                }));
+            } else {
+                promises.push(Promise.resolve(null));
+            }
+            
+            const [charData, charBooks, allUIRegexes, chatLorebook] = await Promise.all(promises);
+            
             updateCharacterRegexes(allUIRegexes, charData);
             updateCharacterLorebooks(charBooks);
             appState.chatLorebook = chatLorebook;
@@ -1984,10 +2004,14 @@
                    console.log(`[RegexLoreHub] Updated chat lorebook from "${oldName}" to "${newName}"`);
                    
                    // 立即验证聊天世界书更新是否成功
-                   const updatedChatLorebook = await TavernAPI.getChatLorebook();
-                   if (updatedChatLorebook !== newName) {
-                       console.warn(`[RegexLoreHub] Chat lorebook update verification failed. Expected: "${newName}", Got: "${updatedChatLorebook}"`);
-                       appState.chatLorebook = updatedChatLorebook;
+                   try {
+                       const updatedChatLorebook = await TavernAPI.getChatLorebook();
+                       if (updatedChatLorebook !== newName) {
+                           console.warn(`[RegexLoreHub] Chat lorebook update verification failed. Expected: "${newName}", Got: "${updatedChatLorebook}"`);
+                           appState.chatLorebook = updatedChatLorebook;
+                       }
+                   } catch (verifyError) {
+                       console.warn('[RegexLoreHub] Failed to verify chat lorebook update:', verifyError);
                    }
                 }
                 
@@ -2016,10 +2040,16 @@
                 
                 // 强制同步聊天世界书状态，确保在所有页面都能正确反映最新状态
                 try {
-                    const finalChatLorebook = await TavernAPI.getChatLorebook();
-                    if (finalChatLorebook !== appState.chatLorebook) {
-                        console.log(`[RegexLoreHub] Final chat lorebook sync: "${finalChatLorebook}"`);
-                        appState.chatLorebook = finalChatLorebook;
+                    // 检查是否有活跃的聊天
+                    const context = window.parent.SillyTavern.getContext() || {};
+                    const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+                    
+                    if (hasActiveChat) {
+                        const finalChatLorebook = await TavernAPI.getChatLorebook();
+                        if (finalChatLorebook !== appState.chatLorebook) {
+                            console.log(`[RegexLoreHub] Final chat lorebook sync: "${finalChatLorebook}"`);
+                            appState.chatLorebook = finalChatLorebook;
+                        }
                     }
                 } catch (syncError) {
                     console.warn('[RegexLoreHub] Failed to sync final chat lorebook state:', syncError);
@@ -2049,10 +2079,16 @@
                  
                  // 在错误恢复后也强制同步聊天世界书状态
                  try {
-                     const finalChatLorebook = await TavernAPI.getChatLorebook();
-                     if (finalChatLorebook !== appState.chatLorebook) {
-                         console.log(`[RegexLoreHub] Final chat lorebook sync after error recovery: "${finalChatLorebook}"`);
-                         appState.chatLorebook = finalChatLorebook;
+                     // 检查是否有活跃的聊天
+                     const context = window.parent.SillyTavern.getContext() || {};
+                     const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+                     
+                     if (hasActiveChat) {
+                         const finalChatLorebook = await TavernAPI.getChatLorebook();
+                         if (finalChatLorebook !== appState.chatLorebook) {
+                             console.log(`[RegexLoreHub] Final chat lorebook sync after error recovery: "${finalChatLorebook}"`);
+                             appState.chatLorebook = finalChatLorebook;
+                         }
                      }
                  } catch (syncError) {
                      console.warn('[RegexLoreHub] Failed to sync chat lorebook state after error recovery:', syncError);
