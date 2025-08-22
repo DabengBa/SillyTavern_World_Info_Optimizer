@@ -103,6 +103,135 @@
                 }
             }
         };
+        // 安全访问 lorebookEntries 的函数
+        const safeGetLorebookEntries = (bookName) => {
+            try {
+                // 检查 appState.lorebookEntries 是否是 Map 对象
+                if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                }
+
+                // 检查 get 方法是否存在
+                if (typeof appState.lorebookEntries.get !== 'function') {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries.get is not a function, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                }
+
+                // 安全地获取条目
+                const entries = appState.lorebookEntries.get(bookName);
+                return Array.isArray(entries) ? entries : [];
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in safeGetLorebookEntries:', error);
+                // 重新初始化 Map
+                appState.lorebookEntries = new Map();
+                return [];
+            }
+        };
+
+        // 安全设置 lorebookEntries 的函数
+        const safeSetLorebookEntries = (bookName, entries) => {
+            try {
+                // 检查 appState.lorebookEntries 是否是 Map 对象
+                if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                }
+
+                // 检查 set 方法是否存在
+                if (typeof appState.lorebookEntries.set !== 'function') {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries.set is not a function, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                }
+
+                // 安全地设置条目
+                appState.lorebookEntries.set(bookName, Array.isArray(entries) ? entries : []);
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in safeSetLorebookEntries:', error);
+                // 重新初始化 Map
+                appState.lorebookEntries = new Map();
+                appState.lorebookEntries.set(bookName, Array.isArray(entries) ? entries : []);
+            }
+        };
+
+        // 安全删除 lorebookEntries 的函数
+        const safeDeleteLorebookEntries = (bookName) => {
+            try {
+                // 检查 appState.lorebookEntries 是否是 Map 对象
+                if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return;
+                }
+
+                // 检查 delete 方法是否存在
+                if (typeof appState.lorebookEntries.delete !== 'function') {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries.delete is not a function, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return;
+                }
+
+                // 安全地删除条目
+                safeDeleteLorebookEntries(bookName);
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in safeDeleteLorebookEntries:', error);
+                // 重新初始化 Map
+                appState.lorebookEntries = new Map();
+            }
+        };
+
+        // 安全清空 lorebookEntries 的函数
+        const safeClearLorebookEntries = () => {
+            try {
+                // 检查 appState.lorebookEntries 是否是 Map 对象
+                if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return;
+                }
+
+                // 检查 clear 方法是否存在
+                if (typeof appState.lorebookEntries.clear !== 'function') {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries.clear is not a function, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return;
+                }
+
+                // 安全地清空
+                safeClearLorebookEntries();
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in safeClearLorebookEntries:', error);
+                // 重新初始化 Map
+                appState.lorebookEntries = new Map();
+            }
+        };
+
+        // 安全检查 lorebookEntries 是否有某个键的函数
+        const safeHasLorebookEntries = (bookName) => {
+            try {
+                // 检查 appState.lorebookEntries 是否是 Map 对象
+                if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return false;
+                }
+
+                // 检查 has 方法是否存在
+                if (typeof appState.lorebookEntries.has !== 'function') {
+                    console.warn('[RegexLoreHub] appState.lorebookEntries.has is not a function, reinitializing...');
+                    appState.lorebookEntries = new Map();
+                    return false;
+                }
+
+                // 安全地检查是否存在
+                return appState.lorebookEntries.has(bookName);
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in safeHasLorebookEntries:', error);
+                // 重新初始化 Map
+                appState.lorebookEntries = new Map();
+                return false;
+            }
+        };
 
         const escapeHtml = (text) => {
             if (typeof text !== 'string') return String(text);
@@ -122,6 +251,11 @@
             // 先转义HTML，然后进行高亮处理
             const escapedText = escapeHtml(text);
             return escapedText.replace(regex, '<mark class="rlh-highlight">$1</mark>');
+            // 防御性检查：确保 appState.lorebookEntries 是 Map 对象
+            if (!appState.lorebookEntries || !(appState.lorebookEntries instanceof Map)) {
+                console.warn('[RegexLoreHub] appState.lorebookEntries is not a Map, reinitializing...');
+                appState.lorebookEntries = new Map();
+            }
         };
 
         const showSuccessTick = (message = '操作成功', duration = 1500) => {
@@ -255,94 +389,162 @@
             const $content = $(`#${PANEL_ID}-content`, parentDoc);
             $content.html('<p class="rlh-info-text">正在加载所有数据，请稍候...</p>');
 
-            const context = window.parent.SillyTavern.getContext();
-            const allCharacters = context.characters || [];
-            const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
-            const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
-
-            let charData = null, charLinkedBooks = null, chatLorebook = null;
-
-            const promises = [
-                TavernAPI.getRegexes(),
-                TavernAPI.getLorebookSettings(),
-                TavernAPI.getLorebooks(),
-            ];
-
-            if (hasActiveCharacter) {
-                promises.push(TavernAPI.getCharData().catch(() => null));
-                promises.push(TavernAPI.getCharLorebooks().catch(() => null));
-            } else {
-                promises.push(Promise.resolve(null), Promise.resolve(null));
-            }
-
-            if (hasActiveChat) {
-                promises.push(TavernAPI.getChatLorebook().catch(() => null));
-            } else {
-                promises.push(Promise.resolve(null));
-            }
-
-            const [allUIRegexes, globalSettings, allBookFileNames, resolvedCharData, resolvedCharLinkedBooks, resolvedChatLorebook] = await Promise.all(promises);
-            
-            charData = resolvedCharData;
-            charLinkedBooks = resolvedCharLinkedBooks;
-            chatLorebook = resolvedChatLorebook;
-
-            appState.regexes.global = allUIRegexes?.filter(r => r.scope === 'global') || [];
-            updateCharacterRegexes(allUIRegexes, charData);
-
-            appState.lorebookEntries.clear();
-            appState.lorebookUsage.clear();
-            const knownBookNames = new Set(allBookFileNames || []);
-
-            if (Array.isArray(allCharacters)) {
-                await Promise.all(allCharacters.map(async (char) => {
-                    const books = await TavernHelper.getCharLorebooks({ name: char.name });
-                    if (books) {
-                        const bookSet = new Set();
-                        if (books.primary) bookSet.add(books.primary);
-                        if (books.additional) books.additional.forEach(b => bookSet.add(b));
-                        
-                        bookSet.forEach(bookName => {
-                            if (!appState.lorebookUsage.has(bookName)) {
-                                appState.lorebookUsage.set(bookName, []);
-                            }
-                            appState.lorebookUsage.get(bookName).push(char.name);
-                            knownBookNames.add(bookName);
-                        });
-                    }
-                }));
-            }
-
-            const enabledGlobalBooks = new Set(globalSettings?.selected_global_lorebooks || []);
-            appState.allLorebooks = (allBookFileNames || []).map(name => ({
-                name: name,
-                enabled: enabledGlobalBooks.has(name)
-            }));
-            
-            const charBookSet = new Set();
-            if (charLinkedBooks?.primary) {
-                charBookSet.add(charLinkedBooks.primary);
-            }
-            if (charLinkedBooks?.additional) {
-                charLinkedBooks.additional.forEach(name => charBookSet.add(name));
-            }
-            appState.lorebooks.character = Array.from(charBookSet);
-            appState.chatLorebook = chatLorebook;
-            if (chatLorebook) {
-                knownBookNames.add(chatLorebook);
-            }
- 
-             const allBooksToLoad = Array.from(knownBookNames);
-             const existingBookFiles = new Set(allBookFileNames || []);
-            await Promise.all(allBooksToLoad.map(async (name) => {
-                if (existingBookFiles.has(name)) {
-                    const entries = await TavernAPI.getLorebookEntries(name) || [];
-                    appState.lorebookEntries.set(name, entries);
+            try {
+                // 防御性检查：确保SillyTavern API可用
+                if (!window.parent.SillyTavern || !window.parent.SillyTavern.getContext) {
+                    console.warn('[RegexLoreHub] SillyTavern API not available, initializing with empty data');
+                    appState.regexes.global = [];
+                    appState.regexes.character = [];
+                    appState.allLorebooks = [];
+                    appState.lorebooks.character = [];
+                    appState.chatLorebook = null;
+                    safeClearLorebookEntries();
+                    appState.isDataLoaded = true;
+                    renderContent();
+                    return;
                 }
-            }));
 
-            appState.isDataLoaded = true;
-            renderContent();
+                const context = window.parent.SillyTavern.getContext() || {};
+                const allCharacters = Array.isArray(context.characters) ? context.characters : [];
+                const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
+                const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+
+                let charData = null, charLinkedBooks = null, chatLorebook = null;
+
+                // 使用Promise.allSettled来避免单个失败影响整体
+                const promises = [
+                    TavernAPI.getRegexes().catch(() => []),
+                    TavernAPI.getLorebookSettings().catch(() => ({})),
+                    TavernAPI.getLorebooks().catch(() => []),
+                ];
+
+                if (hasActiveCharacter) {
+                    promises.push(TavernAPI.getCharData().catch(() => null));
+                    promises.push(TavernAPI.getCharLorebooks().catch(() => null));
+                } else {
+                    promises.push(Promise.resolve(null), Promise.resolve(null));
+                }
+
+                if (hasActiveChat) {
+                    promises.push(TavernAPI.getChatLorebook().catch(() => null));
+                } else {
+                    promises.push(Promise.resolve(null));
+                }
+
+                const results = await Promise.allSettled(promises);
+                
+                // 安全提取结果
+                const allUIRegexes = results[0].status === 'fulfilled' ? results[0].value : [];
+                const globalSettings = results[1].status === 'fulfilled' ? results[1].value : {};
+                const allBookFileNames = results[2].status === 'fulfilled' ? results[2].value : [];
+                charData = results[3]?.status === 'fulfilled' ? results[3].value : null;
+                charLinkedBooks = results[4]?.status === 'fulfilled' ? results[4].value : null;
+                chatLorebook = results[5]?.status === 'fulfilled' ? results[5].value : null;
+
+                appState.regexes.global = Array.isArray(allUIRegexes) ? allUIRegexes.filter(r => r.scope === 'global') : [];
+                updateCharacterRegexes(allUIRegexes, charData);
+
+                safeClearLorebookEntries();
+                appState.lorebookUsage.clear();
+                const knownBookNames = new Set(Array.isArray(allBookFileNames) ? allBookFileNames : []);
+
+                // 安全处理角色世界书
+                if (Array.isArray(allCharacters) && allCharacters.length > 0) {
+                    try {
+                        await Promise.all(allCharacters.map(async (char) => {
+                            if (!char || !char.name) return;
+                            try {
+                                const books = await TavernHelper.getCharLorebooks({ name: char.name }).catch(() => null);
+                                if (books && typeof books === 'object') {
+                                    const bookSet = new Set();
+                                    if (books.primary && typeof books.primary === 'string') bookSet.add(books.primary);
+                                    if (Array.isArray(books.additional)) {
+                                        books.additional.forEach(b => typeof b === 'string' && bookSet.add(b));
+                                    }
+                                    
+                                    bookSet.forEach(bookName => {
+                                        if (typeof bookName === 'string') {
+                                            if (!appState.lorebookUsage.has(bookName)) {
+                                                appState.lorebookUsage.set(bookName, []);
+                                            }
+                                            appState.lorebookUsage.get(bookName).push(char.name);
+                                            knownBookNames.add(bookName);
+                                        }
+                                    });
+                                }
+                            } catch (charError) {
+                                console.warn(`[RegexLoreHub] Error processing character ${char.name}:`, charError);
+                            }
+                        }));
+                    } catch (charProcessingError) {
+                        console.warn('[RegexLoreHub] Error processing characters:', charProcessingError);
+                    }
+                }
+
+                const enabledGlobalBooks = new Set(Array.isArray(globalSettings?.selected_global_lorebooks) ? globalSettings.selected_global_lorebooks : []);
+                appState.allLorebooks = (Array.isArray(allBookFileNames) ? allBookFileNames : []).map(name => ({
+                    name: name,
+                    enabled: enabledGlobalBooks.has(name)
+                }));
+                
+                const charBookSet = new Set();
+                if (charLinkedBooks && typeof charLinkedBooks === 'object') {
+                    if (charLinkedBooks.primary && typeof charLinkedBooks.primary === 'string') {
+                        charBookSet.add(charLinkedBooks.primary);
+                    }
+                    if (Array.isArray(charLinkedBooks.additional)) {
+                        charLinkedBooks.additional.forEach(name => typeof name === 'string' && charBookSet.add(name));
+                    }
+                }
+                appState.lorebooks.character = Array.from(charBookSet);
+                appState.chatLorebook = (typeof chatLorebook === 'string') ? chatLorebook : null;
+                if (typeof chatLorebook === 'string') {
+                    knownBookNames.add(chatLorebook);
+                }
+ 
+                const allBooksToLoad = Array.from(knownBookNames);
+                const existingBookFiles = new Set(Array.isArray(allBookFileNames) ? allBookFileNames : []);
+                
+                // 分批加载世界书条目，避免同时加载过多
+                const batchSize = 5;
+                for (let i = 0; i < allBooksToLoad.length; i += batchSize) {
+                    const batch = allBooksToLoad.slice(i, i + batchSize);
+                    await Promise.allSettled(
+                        batch.map(async (name) => {
+                            if (existingBookFiles.has(name) && typeof name === 'string') {
+                                try {
+                                    const entries = await TavernAPI.getLorebookEntries(name).catch(() => []);
+                                    safeSetLorebookEntries(name, entries);
+                                } catch (entryError) {
+                                    console.warn(`[RegexLoreHub] Error loading entries for book ${name}:`, entryError);
+                                }
+                            }
+                        })
+                    );
+                }
+
+                appState.isDataLoaded = true;
+                renderContent();
+                
+            } catch (error) {
+                console.error('[RegexLoreHub] Error in loadAllData:', error);
+                // 发生严重错误时，显示友好的错误信息
+                $content.html(`
+                    <div style="padding: 20px; text-align: center;">
+                        <p style="color: #ff6b6b; margin-bottom: 10px;">
+                            <i class="fa-solid fa-exclamation-triangle"></i> 数据加载失败
+                        </p>
+                        <p style="color: #666; font-size: 14px;">
+                            请检查开发者控制台获取详细信息，或尝试刷新页面。
+                        </p>
+                        <button class="rlh-modal-btn" onclick="$('#${REFRESH_BTN_ID}').click()" 
+                                style="margin-top: 15px; padding: 8px 16px;">
+                            <i class="fa-solid fa-refresh"></i> 重试
+                        </button>
+                    </div>
+                `);
+                throw error; // 让errorCatched捕获并显示通用错误消息
+            }
         });
 
         const refreshCharacterData = errorCatched(async () => {
@@ -355,11 +557,11 @@
             updateCharacterRegexes(allUIRegexes, charData);
             updateCharacterLorebooks(charBooks);
             appState.chatLorebook = chatLorebook;
-            const newBooksToLoad = appState.lorebooks.character.filter(name => !appState.lorebookEntries.has(name));
+            const newBooksToLoad = appState.lorebooks.character.filter(name => !safeHasLorebookEntries(name));
             if (newBooksToLoad.length > 0) {
                 await Promise.all(newBooksToLoad.map(async (name) => {
-                    const entries = await TavernAPI.getLorebookEntries(name) || [];
-                    appState.lorebookEntries.set(name, entries);
+                    const entries = await TavernAPI.getLorebookEntries(name);
+                    safeSetLorebookEntries(name, entries);
                 }));
             }
         });
@@ -435,6 +637,176 @@
             }
         };
 
+        // 替换功能的处理函数
+        const handleReplace = errorCatched(async () => {
+            const searchTerm = $(`#${SEARCH_INPUT_ID}`, parentDoc).val();
+            const replaceTerm = $('#rlh-replace-input', parentDoc).val();
+            
+            // 检查搜索词是否为空
+            if (!searchTerm) {
+                await showModal({ type: 'alert', title: '替换失败', text: '请先输入搜索词。' });
+                return;
+            }
+            
+            // 检查替换词是否为空
+            if (!replaceTerm) {
+                await showModal({ type: 'alert', title: '替换失败', text: '请先输入替换词。' });
+                return;
+            }
+            
+            // 获取当前视图的匹配项
+            let matches = [];
+            
+            switch (appState.activeTab) {
+                case 'global-lore':
+                    matches = getGlobalLorebookMatches(searchTerm);
+                    break;
+                case 'char-lore':
+                    matches = getCharacterLorebookMatches(searchTerm);
+                    break;
+                case 'chat-lore':
+                    matches = getChatLorebookMatches(searchTerm);
+                    break;
+                default:
+                    await showModal({ type: 'alert', title: '替换失败', text: '替换功能仅支持世界书视图。' });
+                    return;
+            }
+            
+            // 如果没有匹配项，提示用户
+            if (matches.length === 0) {
+                await showModal({ type: 'alert', title: '替换失败', text: '未找到匹配的条目。' });
+                return;
+            }
+            
+            // 显示确认对话框
+            const confirmResult = await showModal({
+                type: 'confirm',
+                title: '确认替换',
+                text: `找到 ${matches.length} 个匹配项。\n\n确定要将 "${searchTerm}" 替换为 "${replaceTerm}" 吗？\n\n注意：此操作仅替换条目的关键词、内容和条目名称，不会替换世界书本身的名称。\n此操作不可撤销，请谨慎操作。`
+            });
+            
+            // 如果用户确认替换，则执行替换
+            if (confirmResult) {
+                const progressToast = showProgressToast('正在执行替换...');
+                try {
+                    await performReplace(matches, searchTerm, replaceTerm);
+                    progressToast.remove();
+                    showSuccessTick('替换完成');
+                    // 刷新视图
+                    renderContent();
+                } catch (error) {
+                    progressToast.remove();
+                    console.error('[RegexLoreHub] Replace error:', error);
+                    await showModal({ type: 'alert', title: '替换失败', text: '替换过程中发生错误，请检查开发者控制台获取详细信息。' });
+                }
+            }
+        });
+
+        // 执行替换操作的函数
+        const performReplace = async (matches, searchTerm, replaceTerm) => {
+            // 创建一个映射来跟踪每个世界书的更改
+            const bookUpdates = new Map();
+            
+            // 遍历所有匹配项
+            for (const match of matches) {
+                const { bookName, entry } = match;
+                let updated = false;
+                
+                // 如果还没有为这个世界书创建更新数组，则创建一个
+                if (!bookUpdates.has(bookName)) {
+                    bookUpdates.set(bookName, []);
+                }
+                
+                // 创建条目的深拷贝以进行修改
+                const updatedEntry = JSON.parse(JSON.stringify(entry));
+                
+                // 替换关键词
+                if (updatedEntry.keys && Array.isArray(updatedEntry.keys)) {
+                    const newKeys = updatedEntry.keys.map(key => 
+                        key.replace(new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\/\\]/g, '\\$&'), 'g'), replaceTerm)
+                    );
+                    // 检查是否有实际更改
+                    if (JSON.stringify(updatedEntry.keys) !== JSON.stringify(newKeys)) {
+                        updatedEntry.keys = newKeys;
+                        updated = true;
+                    }
+                }
+                
+                // 替换条目内容
+                if (updatedEntry.content) {
+                    const newContent = updatedEntry.content.replace(new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\/\\]/g, '\\$&'), 'g'), replaceTerm);
+                    if (updatedEntry.content !== newContent) {
+                        updatedEntry.content = newContent;
+                        updated = true;
+                    }
+                }
+                
+                // 替换条目名称（comment）
+                if (updatedEntry.comment) {
+                    const newComment = updatedEntry.comment.replace(new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\/\\]/g, '\\$&'), 'g'), replaceTerm);
+                    if (updatedEntry.comment !== newComment) {
+                        updatedEntry.comment = newComment;
+                        updated = true;
+                    }
+                }
+                
+                // 如果有更改，则将更新后的条目添加到更新数组中
+                if (updated) {
+                    bookUpdates.get(bookName).push(updatedEntry);
+                }
+            }
+            
+            // 应用所有更改
+            for (const [bookName, entriesToUpdate] of bookUpdates.entries()) {
+                if (entriesToUpdate.length > 0) {
+                    // 调用TavernAPI来更新条目
+                    const result = await TavernAPI.setLorebookEntries(bookName, entriesToUpdate);
+                    if (result && result.entries) {
+                        // 更新本地状态
+                        safeSetLorebookEntries(bookName, result.entries);
+                    }
+                }
+            }
+            
+            // 等待一段时间以确保所有操作完成
+            await new Promise(resolve => setTimeout(resolve, 100));
+        };
+
+        // 获取全局世界书匹配项的函数
+        const getGlobalLorebookMatches = (searchTerm) => {
+            let matches = [];
+            let books = [...appState.allLorebooks].sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name));
+
+            if (!searchTerm) {
+                // 如果没有搜索词，返回所有条目
+                books.forEach(book => {
+                    const entries = [...safeGetLorebookEntries(book.name)];
+                    entries.forEach(entry => {
+                        matches.push({ bookName: book.name, entry });
+                    });
+                });
+            } else {
+                // 根据搜索词和过滤器获取匹配项
+                books.forEach(book => {
+                    const entries = [...safeGetLorebookEntries(book.name)];
+                    let bookNameMatches = appState.searchFilters.bookName && book.name.toLowerCase().includes(searchTerm.toLowerCase());
+                    
+                    entries.forEach(entry => {
+                        let entryNameMatches = appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm.toLowerCase());
+                        let keywordsMatch = appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+                        let contentMatch = appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm.toLowerCase());
+                        
+                        // 如果书名匹配，或者条目名、关键词、内容中有任何一个匹配，则添加到匹配项中
+                        if (bookNameMatches || entryNameMatches || keywordsMatch || contentMatch) {
+                            matches.push({ bookName: book.name, entry });
+                        }
+                    });
+                });
+            }
+            
+            return matches;
+        };
+
         const renderGlobalLorebookView = (searchTerm, $container) => {
             let books = [...appState.allLorebooks].sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name));
             let filteredBookData = [];
@@ -443,7 +815,7 @@
                 filteredBookData = books.map(book => ({ book, forceShowAllEntries: true, filteredEntries: null }));
             } else {
                 books.forEach(book => {
-                    const entries = appState.lorebookEntries.get(book.name) || [];
+                    const entries = [...safeGetLorebookEntries(book.name)];
                     let bookNameMatches = appState.searchFilters.bookName && book.name.toLowerCase().includes(searchTerm);
                     let matchingEntries = entries.filter(entry =>
                         (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) ||
@@ -468,6 +840,44 @@
                     $container.append(createGlobalLorebookElement(data.book, searchTerm, data.forceShowAllEntries, data.filteredEntries));
                 }
             });
+        };
+
+        // 获取角色世界书匹配项的函数
+        const getCharacterLorebookMatches = (searchTerm) => {
+            let matches = [];
+            const linkedBooks = appState.lorebooks.character;
+            const context = window.parent.SillyTavern.getContext();
+            const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
+
+            if (!hasActiveCharacter || linkedBooks.length === 0) {
+                return matches;
+            }
+
+            linkedBooks.forEach(bookName => {
+                const entries = [...safeGetLorebookEntries(bookName)].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+                
+                if (!searchTerm) {
+                    // 如果没有搜索词，返回所有条目
+                    entries.forEach(entry => {
+                        matches.push({ bookName, entry });
+                    });
+                } else {
+                    // 根据搜索词和过滤器获取匹配项
+                    entries.forEach(entry => {
+                        let bookNameMatches = appState.searchFilters.bookName && bookName.toLowerCase().includes(searchTerm.toLowerCase());
+                        let entryNameMatches = appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm.toLowerCase());
+                        let keywordsMatch = appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+                        let contentMatch = appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm.toLowerCase());
+                        
+                        // 如果书名匹配，或者条目名、关键词、内容中有任何一个匹配，则添加到匹配项中
+                        if (bookNameMatches || entryNameMatches || keywordsMatch || contentMatch) {
+                            matches.push({ bookName, entry });
+                        }
+                    });
+                }
+            });
+            
+            return matches;
         };
 
         const renderCharacterLorebookView = (searchTerm, $container) => {
@@ -501,7 +911,7 @@
                 const $entryActions = $(`<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-shield-halved"></i> 全开防递</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`);
                 $listWrapper.append($entryActions);
                 
-                let entries = [...(appState.lorebookEntries.get(bookName) || [])].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+                let entries = [...safeGetLorebookEntries(bookName)].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
                 let bookNameMatches = !searchTerm || (appState.searchFilters.bookName && bookName.toLowerCase().includes(searchTerm));
                 let matchingEntries = entries.filter(entry => !searchTerm || (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) || (appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm)) || (appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm)));
 
@@ -529,6 +939,41 @@
             if (renderedCount === 0 && searchTerm) {
                 $container.html(`<p class="rlh-info-text">未找到匹配的世界书或条目。</p>`);
             }
+        };
+
+        // 获取聊天世界书匹配项的函数
+        const getChatLorebookMatches = (searchTerm) => {
+            let matches = [];
+            const bookName = appState.chatLorebook;
+            const context = window.parent.SillyTavern.getContext();
+            const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+
+            if (!hasActiveChat || !bookName) {
+                return matches;
+            }
+
+            const entries = [...safeGetLorebookEntries(bookName)].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+            
+            if (!searchTerm) {
+                // 如果没有搜索词，返回所有条目
+                entries.forEach(entry => {
+                    matches.push({ bookName, entry });
+                });
+            } else {
+                // 根据搜索词和过滤器获取匹配项
+                entries.forEach(entry => {
+                    let entryNameMatches = appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm.toLowerCase());
+                    let keywordsMatch = appState.searchFilters.keywords && entry.keys.join(' ').toLowerCase().includes(searchTerm.toLowerCase());
+                    let contentMatch = appState.searchFilters.content && entry.content && entry.content.toLowerCase().includes(searchTerm.toLowerCase());
+                    
+                    // 如果条目名、关键词、内容中有任何一个匹配，则添加到匹配项中
+                    if (entryNameMatches || keywordsMatch || contentMatch) {
+                        matches.push({ bookName, entry });
+                    }
+                });
+            }
+            
+            return matches;
         };
 
         const renderChatLorebookView = (searchTerm, $container) => {
@@ -567,7 +1012,7 @@
             const $entryActions = $(`<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-shield-halved"></i> 全开防递</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(bookName)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`);
             $listWrapper.append($entryActions);
 
-            let entries = [...(appState.lorebookEntries.get(bookName) || [])].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+            let entries = [...safeGetLorebookEntries(bookName)].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
             let matchingEntries = entries.filter(entry =>
                 !searchTerm ||
                 (appState.searchFilters.entryName && (entry.comment || '').toLowerCase().includes(searchTerm)) ||
@@ -668,8 +1113,8 @@
             const $entryActions = $(`<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-shield-halved"></i> 全开防递</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`);
             $content.append($entryActions);
             
-            let allEntries = [...(appState.lorebookEntries.get(book.name) || [])].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
-            let entriesToShow = forceShowAllEntries ? allEntries : filteredEntries;
+            let allEntries = [...safeGetLorebookEntries(book.name)].sort((a, b) => b.enabled - a.enabled || a.display_index - b.display_index);
+            let entriesToShow = forceShowAllEntries ? allEntries : (filteredEntries || []);
 
             if (entriesToShow && entriesToShow.length > 0) {
                 const $listWrapper = $('<div class="rlh-entry-list-wrapper"></div>');
@@ -740,13 +1185,13 @@
             if (activeTab === 'global-lore') {
                 appState.allLorebooks.forEach(book => {
                     visibleItems.push({ type: 'book', id: book.name, enabled: book.enabled });
-                    (appState.lorebookEntries.get(book.name) || []).forEach(entry => {
+                    [...safeGetLorebookEntries(book.name)].forEach(entry => {
                         visibleItems.push({ type: 'lore', id: entry.uid, bookName: book.name, enabled: entry.enabled });
                     });
                 });
             } else if (activeTab === 'char-lore') {
                 appState.lorebooks.character.forEach(bookName => {
-                    (appState.lorebookEntries.get(bookName) || []).forEach(entry => {
+                    [...safeGetLorebookEntries(bookName)].forEach(entry => {
                         visibleItems.push({ type: 'lore', id: entry.uid, bookName, enabled: entry.enabled });
                     });
                 });
@@ -947,7 +1392,7 @@
 
                     if (result && result.delete_occurred) {
                         deletedEntriesCount += uids.length;
-                        appState.lorebookEntries.set(bookName, result.entries);
+                        safeSetLorebookEntries(bookName, result.entries);
                         uids.forEach(uid => appState.selectedItems.delete(`lore:${bookName}:${uid}`));
                     }
                 }
@@ -959,7 +1404,7 @@
                     if (await TavernAPI.deleteLorebook(bookName)) {
                         deletedBooksCount++;
                         appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
-                        appState.lorebookEntries.delete(bookName);
+                        safeDeleteLorebookEntries(bookName);
                         appState.selectedItems.delete(`book:${bookName}`);
                         for (const key of appState.selectedItems) {
                             if (key.startsWith(`lore:${bookName}:`)) {
@@ -1045,7 +1490,7 @@
 
             if (selectedEntriesByBook.size > 0) {
                 for (const [bookName, entryIds] of selectedEntriesByBook) {
-                    const entries = appState.lorebookEntries.get(bookName);
+                    const entries = [...safeGetLorebookEntries(bookName)];
                     if (entries) {
                         const updates = entryIds.map(uid => {
                             const entry = entries.find(e => e.uid === uid);
@@ -1155,7 +1600,8 @@
 
             if (type === 'lore') {
                 const bookName = $container.data('book-name');
-                item = appState.lorebookEntries.get(bookName)?.find(e => e.uid === id);
+                const entries = [...safeGetLorebookEntries(bookName)];
+                item = entries.find(e => e.uid === id);
                 if (!item) return;
 
                 const positionOptions = Object.entries(LOREBOOK_OPTIONS.position).map(([value, text]) => `<option value="${value}" ${item.position === value ? 'selected' : ''}>${text}</option>`).join('');
@@ -1263,7 +1709,7 @@
                 if (type === 'lore') {
                     const bookName = $elementToSort.data('book-name');
                     await TavernAPI.setLorebookEntries(bookName, [{ uid: Number(id), enabled: isEnabling }]);
-                    const entry = appState.lorebookEntries.get(bookName)?.find(e => e.uid === Number(id));
+                    const entry = safeGetLorebookEntries(bookName).find(e => e.uid === Number(id));
                     if (entry) entry.enabled = isEnabling;
                 } else {
                     const allServerRegexes = await TavernAPI.getRegexes();
@@ -1321,7 +1767,7 @@
                 
                 await TavernAPI.setLorebookEntries(bookName, [updatedEntry]);
                 
-                const entry = appState.lorebookEntries.get(bookName)?.find(e => e.uid === Number(id));
+                const entry = safeGetLorebookEntries(bookName).find(e => e.uid === Number(id));
                 if (entry) { Object.assign(entry, updatedEntry); }
                 
             } else { // type === 'regex'
@@ -1446,7 +1892,7 @@
                     throw new Error('创建新世界书文件失败。');
                 }
 
-                const oldEntries = appState.lorebookEntries.get(oldName) || [];
+                const oldEntries = [...safeGetLorebookEntries(oldName)];
                 if (oldEntries.length > 0) {
                     progressToast.update('正在复制条目...');
                     const entriesToCreate = oldEntries.map(entry => {
@@ -1536,7 +1982,8 @@
             if (type === 'lore') {
                 const bookName = $container.data('book-name');
                 await TavernAPI.setLorebookEntries(bookName, [{ uid: Number(id), comment: newName }]);
-                const entry = appState.lorebookEntries.get(bookName)?.find(e => e.uid === Number(id));
+                const entries = [...safeGetLorebookEntries(bookName)];
+                const entry = entries.find(e => e.uid === Number(id));
                 if (entry) entry.comment = newName;
             } else { // type === 'regex'
                 const allServerRegexes = await TavernAPI.getRegexes();
@@ -1649,7 +2096,7 @@
             const success = await TavernAPI.deleteLorebook(bookName);
             if (success) {
                 appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
-                appState.lorebookEntries.delete(bookName);
+                safeDeleteLorebookEntries(bookName);
                 $bookGroup.slideUp(300, () => $bookGroup.remove());
                 showSuccessTick("删除成功");
             } else {
@@ -1664,7 +2111,7 @@
             
             if (result && result.new_uids && result.new_uids.length > 0) {
                 const newEntry = result.entries.find(e => e.uid === result.new_uids[0]);
-                appState.lorebookEntries.set(bookName, result.entries);
+                safeSetLorebookEntries(bookName, result.entries);
                 const $newEntryElement = createItemElement(newEntry, 'lore', bookName);
                 $button.parent('.rlh-entry-actions').after($newEntryElement);
                 $newEntryElement.hide().slideDown(200, () => {
@@ -1694,7 +2141,7 @@
             
             const result = await TavernAPI.deleteLorebookEntries(bookName, [uid]);
             if (result && result.delete_occurred) {
-                appState.lorebookEntries.set(bookName, result.entries);
+                safeSetLorebookEntries(bookName, result.entries);
                 $item.slideUp(300, () => $item.remove());
                 showSuccessTick("删除成功");
             } else {
@@ -1746,7 +2193,7 @@
 
         const handleBatchSetRecursion = errorCatched(async (event) => {
             const bookName = $(event.currentTarget).data('book-name');
-            const entries = appState.lorebookEntries.get(bookName);
+            const entries = [...safeGetLorebookEntries(bookName)];
             if (!entries || entries.length === 0) {
                 await showModal({ type: 'alert', title: '提示', text: '该世界书没有条目可操作。' });
                 return;
@@ -1781,7 +2228,7 @@
 
         const handleFixKeywords = errorCatched(async (event) => {
             const bookName = $(event.currentTarget).data('book-name');
-            const entries = appState.lorebookEntries.get(bookName);
+            const entries = [...safeGetLorebookEntries(bookName)];
             if (!entries || entries.length === 0) {
                 await showModal({ type: 'alert', title: '提示', text: '该世界书没有条目可操作。' });
                 return;
@@ -1932,7 +2379,7 @@
                 .rlh-tab-text-full { display: inline;} 
                 .rlh-search-container { padding: 10px 20px; border-bottom: 1px solid var(--rlh-border-color); flex-shrink: 0;} 
                 .rlh-search-controls { display: flex; align-items: center; gap: 8px;} 
-                #${SEARCH_INPUT_ID} {
+                #${SEARCH_INPUT_ID}, #rlh-replace-input {
                     width: 100%; flex-grow: 1; padding: 10px; border: 1px solid var(--rlh-border-color);
                     border-radius: 8px; box-sizing: border-box; background-color: var(--rlh-input-bg); color: #2C3E50 !important;
                 }
@@ -2247,7 +2694,9 @@
                 </div>
                 <div class="rlh-search-container">
                     <div class="rlh-search-controls">
-                        <input type="search" id="${SEARCH_INPUT_ID}" placeholder="搜索...">
+                        <input type="search" id="${SEARCH_INPUT_ID}" placeholder="搜索..." style="width: 40%;">
+                        <input type="text" id="rlh-replace-input" placeholder="替换为..." style="width: 40%;">
+                        <button id="rlh-replace-btn" class="rlh-search-action-btn" title="替换"><i class="fa-solid fa-exchange-alt"></i></button>
                         <button id="rlh-multi-select-btn" class="rlh-search-action-btn rlh-multi-select-btn" title="多选模式"><i class="fa-solid fa-list-check"></i></button>
                         <button id="${CREATE_LOREBOOK_BTN_ID}" class="rlh-search-action-btn" title="新建世界书"><i class="fa-solid fa-plus"></i></button>
                         <button id="${REFRESH_BTN_ID}" class="rlh-search-action-btn" title="同步/刷新角色数据"><i class="fa-solid fa-sync"></i></button>
@@ -2321,7 +2770,8 @@
                 .on('keydown.rlh', '.rlh-rename-input', handleRenameKeydown)
                 .on('change.rlh', '.rlh-edit-position', handlePositionChange)
                 .on('click.rlh', '#rlh-create-chat-lore-btn', handleCreateChatLorebook)
-                .on('click.rlh', '.rlh-unlink-chat-lore-btn', handleUnlinkChatLorebook);
+                .on('click.rlh', '.rlh-unlink-chat-lore-btn', handleUnlinkChatLorebook)
+                .on('click.rlh', '#rlh-replace-btn', handleReplace);
             console.log('[RegexLoreHub] All UI and events initialized.');
         }
 
