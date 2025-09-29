@@ -1384,6 +1384,33 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
+  .rlh-global-book-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .rlh-global-book-header .rlh-book-title-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rlh-global-book-header .rlh-item-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .rlh-global-book-header .rlh-book-stats {
+    white-space: nowrap;
+  }
+
+  .rlh-global-book-header .rlh-item-controls {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    margin-left: auto;
+  }
+
   .rlh-global-book-header.enabled {
     color: color-mix(in srgb, var(--rlh-text-color) 70%, var(--rlh-accent-color) 30%);
     background: linear-gradient(135deg, color-mix(in srgb, var(--rlh-accent-color) 32%, var(--rlh-surface-color)) 0%, color-mix(in srgb, var(--rlh-accent-color) 18%, var(--rlh-surface-color)) 100%);
@@ -1427,12 +1454,14 @@
       align-items: flex-start;
       gap: 0.45rem;
       padding: 0.7rem 0.75rem;
+      flex-wrap: wrap;
     }
 
     .rlh-item-header-main {
       flex-direction: column;
       align-items: flex-start;
       gap: 0.3rem;
+      width: 100%;
     }
 
     .rlh-item-name {
@@ -1457,37 +1486,39 @@
     }
 
     .rlh-item-controls {
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.15rem;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.18rem;
       width: auto;
+      align-self: flex-start;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 1.7rem;
-      height: 1.7rem;
-      border-radius: 0.65rem;
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 0.6rem;
       padding: 0;
       border-width: 1px;
     }
 
     .rlh-item-controls .rlh-toggle-btn i,
     .rlh-item-controls .rlh-action-btn-icon i {
-      font-size: 0.82rem;
+      font-size: 0.75rem;
     }
 
     .rlh-detail-header .rlh-item-controls {
-      justify-self: end;
+      justify-self: flex-end;
     }
 
     .rlh-book-group-header .rlh-item-controls {
       position: static;
       transform: none;
       justify-content: flex-end;
-      align-items: flex-end;
+      align-items: center;
       margin-left: auto;
-      margin-top: 0.2rem;
+      margin-top: 0.25rem;
     }
 
     .rlh-item-meta {
@@ -1556,30 +1587,24 @@
     }
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) and (min-width: 721px) {
     .rlh-item-controls {
       flex-direction: column;
-      align-items: stretch;
-      gap: 0.25rem;
-      width: 100%;
+      align-items: flex-end;
+      gap: 0.22rem;
+      width: auto;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 100%;
-      height: 2.25rem;
+      width: 1.75rem;
+      height: 1.75rem;
     }
 
-    .rlh-detail-header .rlh-item-controls {
-      justify-self: stretch;
-    }
-
-    .rlh-book-group-header .rlh-item-controls {
-      position: static;
-      transform: none;
-      justify-content: center;
-      margin-left: 0;
-      margin-top: 0.4rem;
+    .rlh-item-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
     }
   }
 
