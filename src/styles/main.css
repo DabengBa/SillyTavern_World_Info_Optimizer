@@ -2,6 +2,13 @@
 @import "tailwindcss/utilities.css" layer(utilities) prefix(rlh);
 
 @layer base {
+  #regex-lore-hub-panel,
+  #regex-lore-hub-panel *,
+  #regex-lore-hub-panel *::before,
+  #regex-lore-hub-panel *::after {
+    box-sizing: border-box;
+  }
+
   #regex-lore-hub-panel * {
     text-shadow: none !important;
   }
@@ -510,6 +517,57 @@
 
     .rlh-replace-body {
       grid-template-columns: minmax(0, 1fr) auto;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .rlh-search-box {
+      width: 100%;
+      padding: 0.18rem 0.24rem;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.26rem;
+    }
+
+    .rlh-search-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0.18rem;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .rlh-search-field {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .rlh-search-row .rlh-toolbar-icon-btn {
+      flex: 0 0 2.35rem;
+    }
+
+    .rlh-replace-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0.18rem;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .rlh-replace-input {
+      flex: 0 1 clamp(5.5rem, 45vw, 7rem);
+      min-width: 5rem;
+      width: auto;
+    }
+
+    .rlh-replace-body .rlh-toolbar-icon-btn {
+      flex: 0 0 2.35rem;
+    }
+
+    .rlh-search-meta {
+      flex-wrap: wrap;
+      gap: 0.3rem;
     }
   }
 
@@ -1173,6 +1231,14 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
+  @media (max-width: 600px) {
+    #rlh-replace-input,
+    .rlh-replace-input {
+      width: auto;
+      max-width: clamp(5.5rem, 45vw, 7rem);
+    }
+  }
+
   #rlh-search-input:focus,
   .rlh-search-input:focus,
   #rlh-replace-input:focus,
@@ -1384,33 +1450,6 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
-  .rlh-global-book-header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .rlh-global-book-header .rlh-book-title-wrapper {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .rlh-global-book-header .rlh-item-name {
-    flex: 0 1 auto;
-    min-width: 0;
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  .rlh-global-book-header .rlh-book-stats {
-    white-space: nowrap;
-  }
-
-  .rlh-global-book-header .rlh-item-controls {
-    flex: 0 0 auto;
-    margin-top: 0.1rem;
-    margin-left: auto;
-  }
-
   .rlh-global-book-header.enabled {
     color: color-mix(in srgb, var(--rlh-text-color) 70%, var(--rlh-accent-color) 30%);
     background: linear-gradient(135deg, color-mix(in srgb, var(--rlh-accent-color) 32%, var(--rlh-surface-color)) 0%, color-mix(in srgb, var(--rlh-accent-color) 18%, var(--rlh-surface-color)) 100%);
@@ -1454,14 +1493,12 @@
       align-items: flex-start;
       gap: 0.45rem;
       padding: 0.7rem 0.75rem;
-      flex-wrap: wrap;
     }
 
     .rlh-item-header-main {
       flex-direction: column;
       align-items: flex-start;
       gap: 0.3rem;
-      width: 100%;
     }
 
     .rlh-item-name {
@@ -1486,39 +1523,37 @@
     }
 
     .rlh-item-controls {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 0.18rem;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.15rem;
       width: auto;
-      align-self: flex-start;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 1.55rem;
-      height: 1.55rem;
-      border-radius: 0.6rem;
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 0.65rem;
       padding: 0;
       border-width: 1px;
     }
 
     .rlh-item-controls .rlh-toggle-btn i,
     .rlh-item-controls .rlh-action-btn-icon i {
-      font-size: 0.75rem;
+      font-size: 0.82rem;
     }
 
     .rlh-detail-header .rlh-item-controls {
-      justify-self: flex-end;
+      justify-self: end;
     }
 
     .rlh-book-group-header .rlh-item-controls {
       position: static;
       transform: none;
       justify-content: flex-end;
-      align-items: center;
+      align-items: flex-end;
       margin-left: auto;
-      margin-top: 0.25rem;
+      margin-top: 0.2rem;
     }
 
     .rlh-item-meta {
@@ -1587,24 +1622,30 @@
     }
   }
 
-  @media (max-width: 900px) and (min-width: 721px) {
+  @media (max-width: 720px) {
     .rlh-item-controls {
       flex-direction: column;
-      align-items: flex-end;
-      gap: 0.22rem;
-      width: auto;
+      align-items: stretch;
+      gap: 0.25rem;
+      width: 100%;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 1.75rem;
-      height: 1.75rem;
+      width: 100%;
+      height: 2.25rem;
     }
 
-    .rlh-item-name {
-      flex: 1 1 auto;
-      min-width: 0;
-      max-width: 100%;
+    .rlh-detail-header .rlh-item-controls {
+      justify-self: stretch;
+    }
+
+    .rlh-book-group-header .rlh-item-controls {
+      position: static;
+      transform: none;
+      justify-content: center;
+      margin-left: 0;
+      margin-top: 0.4rem;
     }
   }
 
