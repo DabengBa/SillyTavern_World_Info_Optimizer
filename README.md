@@ -92,8 +92,8 @@ v3.0 版本聚焦于代码重构和性能优化，确保脚本在复杂场景下
 ## 🛠️ 安装与使用 (新增自动更新功能)
 
 1. 确保您的酒馆安装了 [JS-Slash-Runner](https://github.com/N0VI028/JS-Slash-Runner) 扩展。
-2. 前往本项目的 Releases 页面下载最新的 `.json` 文件。(**自动更新版本还在等网络缓存, 之后发布**)
-   ![下载JSON](assets/image-20250804154445387.png)
+2. 前往本项目的 Releases 页面下载最新的 `.json` 文件。其中`Updated_cdn.json`为自动更新版本，每次加载SillyTavern会自动获取插件的最新版本。
+   ![image-20250929121748083](assets/image-20250929121748083.png)
 3. 在SillyTavern的"扩展"界面中，找到"JS-Slash-Runner"，点击"导入脚本"。
    ![导入脚本](assets/image-20250804154836205.png)
 4. 选择下载的 `.json` 文件，并确保脚本类型为 **"全局脚本"**。
