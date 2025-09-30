@@ -2,13 +2,6 @@
 @import "tailwindcss/utilities.css" layer(utilities) prefix(rlh);
 
 @layer base {
-  #regex-lore-hub-panel,
-  #regex-lore-hub-panel *,
-  #regex-lore-hub-panel *::before,
-  #regex-lore-hub-panel *::after {
-    box-sizing: border-box;
-  }
-
   #regex-lore-hub-panel * {
     text-shadow: none !important;
   }
@@ -37,32 +30,28 @@
     --rlh-bg-color: #101827;
     --rlh-surface-color: #111827cc;
     --rlh-text-color: #f9fafb;
-    --rlh-em-color: #94a3b8;
-    --rlh-border-color: #1f2933;
+    --rlh-em-color: #cbd5e1;
+    --rlh-border-color: #2d3748;
     --rlh-hover-bg: color-mix(in srgb, var(--rlh-accent-color) 14%, transparent);
     --rlh-selected-bg: color-mix(in srgb, var(--rlh-accent-color) 22%, transparent);
     --rlh-shadow-color: #02061780;
     --rlh-header-bg: color-mix(in srgb, #0f172a 90%, transparent);
     --rlh-input-bg: color-mix(in srgb, #1f2937 85%, transparent);
     --rlh-accent-color: #6366f1;
-    --rlh-green: #22d3ee;
-    --rlh-red: #f43f5e;
+    --rlh-green: #10b981;
+    --rlh-red: #fb7185;
     --rlh-green-bg: color-mix(in srgb, var(--rlh-green) 20%, transparent);
     --rlh-red-bg: color-mix(in srgb, var(--rlh-red) 20%, transparent);
   }
 
   @keyframes rlhFadeInUp {
-    0% {
+    from {
       opacity: 0;
-      transform: translateY(18px) scale(0.98);
+      transform: translateY(12px);
     }
-    65% {
+    to {
       opacity: 1;
-      transform: translateY(-4px) scale(1.01);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
   }
 
@@ -146,7 +135,7 @@
     border: 1px solid var(--rlh-border-color);
     box-shadow: 0 32px 120px -60px var(--rlh-shadow-color);
     overflow: hidden;
-    animation: rlhFadeInUp 0.45s cubic-bezier(0.22, 0.7, 0.36, 1) both;
+    animation: rlhFadeInUp 0.3s ease-out both;
   }
 
   #regex-lore-hub-panel .rlh-shell::before {
@@ -199,7 +188,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     color: var(--rlh-em-color);
     margin: 0 !important;
     line-height: 1.2;
@@ -218,7 +207,7 @@
 
   .rlh-shell-dot {
     color: color-mix(in srgb, var(--rlh-em-color) 80%, transparent);
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     line-height: 1;
   }
 
@@ -520,57 +509,6 @@
     }
   }
 
-  @media (max-width: 600px) {
-    .rlh-search-box {
-      width: 100%;
-      padding: 0.18rem 0.24rem;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0.26rem;
-    }
-
-    .rlh-search-row {
-      display: flex;
-      align-items: stretch;
-      gap: 0.18rem;
-      width: 100%;
-      min-width: 0;
-    }
-
-    .rlh-search-field {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-
-    .rlh-search-row .rlh-toolbar-icon-btn {
-      flex: 0 0 2.35rem;
-    }
-
-    .rlh-replace-body {
-      display: flex;
-      align-items: stretch;
-      gap: 0.18rem;
-      width: 100%;
-      flex-wrap: wrap;
-    }
-
-    .rlh-replace-input {
-      flex: 0 1 clamp(5.5rem, 45vw, 7rem);
-      min-width: 5rem;
-      width: auto;
-    }
-
-    .rlh-replace-body .rlh-toolbar-icon-btn {
-      flex: 0 0 2.35rem;
-    }
-
-    .rlh-search-meta {
-      flex-wrap: wrap;
-      gap: 0.3rem;
-    }
-  }
-
   .rlh-content-pane {
     flex: 1 1 auto;
     min-height: 0;
@@ -868,7 +806,7 @@
   }
 
   .rlh-info-text-small {
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     color: color-mix(in srgb, var(--rlh-em-color) 70%, transparent);
   }
 
@@ -1027,7 +965,7 @@
     padding: 0.1rem 0.5rem;
     border-radius: 9999px;
     background-color: var(--rlh-hover-bg);
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     font-weight: 600;
     color: color-mix(in srgb, var(--rlh-accent-color) 70%, var(--rlh-text-color));
   }
@@ -1188,7 +1126,7 @@
 
   #regex-lore-hub-panel.rlh-multi-select-mode .rlh-selection-count {
     color: color-mix(in srgb, var(--rlh-accent-color) 65%, transparent);
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
   }
 
   .rlh-book-group.editing-entries,
@@ -1229,14 +1167,6 @@
     color: var(--rlh-text-color);
     font-size: 0.92rem;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  @media (max-width: 600px) {
-    #rlh-replace-input,
-    .rlh-replace-input {
-      width: auto;
-      max-width: clamp(5.5rem, 45vw, 7rem);
-    }
   }
 
   #rlh-search-input:focus,
@@ -1450,6 +1380,33 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
   }
 
+  .rlh-global-book-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .rlh-global-book-header .rlh-book-title-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .rlh-global-book-header .rlh-item-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .rlh-global-book-header .rlh-book-stats {
+    white-space: nowrap;
+  }
+
+  .rlh-global-book-header .rlh-item-controls {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+    margin-left: auto;
+  }
+
   .rlh-global-book-header.enabled {
     color: color-mix(in srgb, var(--rlh-text-color) 70%, var(--rlh-accent-color) 30%);
     background: linear-gradient(135deg, color-mix(in srgb, var(--rlh-accent-color) 32%, var(--rlh-surface-color)) 0%, color-mix(in srgb, var(--rlh-accent-color) 18%, var(--rlh-surface-color)) 100%);
@@ -1493,12 +1450,14 @@
       align-items: flex-start;
       gap: 0.45rem;
       padding: 0.7rem 0.75rem;
+      flex-wrap: wrap;
     }
 
     .rlh-item-header-main {
       flex-direction: column;
       align-items: flex-start;
       gap: 0.3rem;
+      width: 100%;
     }
 
     .rlh-item-name {
@@ -1523,37 +1482,39 @@
     }
 
     .rlh-item-controls {
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.15rem;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.18rem;
       width: auto;
+      align-self: flex-start;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 1.7rem;
-      height: 1.7rem;
-      border-radius: 0.65rem;
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 0.6rem;
       padding: 0;
       border-width: 1px;
     }
 
     .rlh-item-controls .rlh-toggle-btn i,
     .rlh-item-controls .rlh-action-btn-icon i {
-      font-size: 0.82rem;
+      font-size: max(0.8125rem, 13px);
     }
 
     .rlh-detail-header .rlh-item-controls {
-      justify-self: end;
+      justify-self: flex-end;
     }
 
     .rlh-book-group-header .rlh-item-controls {
       position: static;
       transform: none;
       justify-content: flex-end;
-      align-items: flex-end;
+      align-items: center;
       margin-left: auto;
-      margin-top: 0.2rem;
+      margin-top: 0.25rem;
     }
 
     .rlh-item-meta {
@@ -1622,30 +1583,24 @@
     }
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) and (min-width: 721px) {
     .rlh-item-controls {
       flex-direction: column;
-      align-items: stretch;
-      gap: 0.25rem;
-      width: 100%;
+      align-items: flex-end;
+      gap: 0.22rem;
+      width: auto;
     }
 
     .rlh-item-controls .rlh-toggle-btn,
     .rlh-item-controls .rlh-action-btn-icon {
-      width: 100%;
-      height: 2.25rem;
+      width: 1.75rem;
+      height: 1.75rem;
     }
 
-    .rlh-detail-header .rlh-item-controls {
-      justify-self: stretch;
-    }
-
-    .rlh-book-group-header .rlh-item-controls {
-      position: static;
-      transform: none;
-      justify-content: center;
-      margin-left: 0;
-      margin-top: 0.4rem;
+    .rlh-item-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
     }
   }
 
@@ -2004,7 +1959,7 @@
   }
 
   .rlh-loading-progress {
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     color: color-mix(in srgb, var(--rlh-em-color) 70%, transparent);
   }
 
@@ -2084,7 +2039,7 @@
   }
 
   .rlh-section-title {
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     font-weight: 600;
@@ -2217,7 +2172,7 @@
   }
 
   .rlh-book-stats {
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     color: var(--rlh-em-color);
   }
 
@@ -2233,7 +2188,7 @@
     padding: 0.1rem 0.5rem;
     border-radius: 9999px;
     background-color: var(--rlh-selected-bg);
-    font-size: 0.75rem;
+    font-size: max(0.8125rem, 13px);
     margin: 0.1rem;
   }
 
@@ -2329,4 +2284,57 @@
   padding-bottom: 0;
   margin-top: 0;
   margin-bottom: 0;
+}
+
+/* 高优先级改进：移动端触摸目标增大到44x44px */
+@media (max-width: 640px) {
+  .rlh-toggle-btn,
+  .rlh-action-btn-icon,
+  .rlh-toolbar-icon-btn,
+  .rlh-icon-button,
+  .rlh-close-button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    width: 44px;
+    height: 44px;
+    padding: 0.5rem;
+  }
+
+  .rlh-multi-select-action-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .rlh-item-controls {
+    gap: 0.5rem !important;
+  }
+
+  .rlh-item-controls .rlh-toggle-btn,
+  .rlh-item-controls .rlh-action-btn-icon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+/* 中优先级改进：增强键盘焦点可见性 */
+@layer components {
+  .rlh-toolbar-btn:focus-visible,
+  .rlh-icon-button:focus-visible,
+  .rlh-close-button:focus-visible,
+  .rlh-toggle-btn:focus-visible,
+  .rlh-action-btn-icon:focus-visible,
+  .rlh-toolbar-icon-btn:focus-visible {
+    outline: 3px solid var(--rlh-accent-color) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--rlh-accent-color) 20%, transparent) !important;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: 3px solid var(--rlh-accent-color);
+    outline-offset: 2px;
+  }
 }

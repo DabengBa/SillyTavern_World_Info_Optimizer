@@ -190,7 +190,7 @@ export const getViewContext = () => {
       showPositionMenu: false,
       sortOptions: [],
       multiSelectTarget: 'regex',
-      supportsMultiSelect: true,
+      supportsMultiSelect: false,
       primaryAction: { visible: false },
     };
   }
