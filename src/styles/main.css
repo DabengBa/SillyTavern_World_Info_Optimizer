@@ -709,6 +709,36 @@
     color: color-mix(in srgb, var(--rlh-accent-color) 65%, var(--rlh-text-color));
   }
 
+  @media (max-width: 1200px) {
+    .rlh-search-section-grid {
+      flex-direction: column;
+    }
+
+    .rlh-search-section-main,
+    .rlh-search-section-multiselect {
+      flex: 1 1 100%;
+      max-width: none;
+    }
+
+    .rlh-search-box {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "row"
+        "replace"
+        "meta";
+    }
+
+    .rlh-replace-body {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .rlh-search-meta {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: 0.35rem;
+    }
+  }
+
   .rlh-sort-menu,
   .rlh-position-menu {
     position: relative;
