@@ -1768,6 +1768,7 @@
     border-top: none;
     border-radius: 0 0 12px 12px;
     line-height: 1.5;
+    white-space: pre-wrap;
   }
 
   .rlh-viewer-text > article {
