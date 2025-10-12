@@ -843,7 +843,7 @@ export const buildReplaceConfirmationHTML = (matches, stats, booksMatchedByNameO
       ${summaryHtml}
       <hr>
       <h4>将要修改的条目列表：</h4>
-      <div class="rlh-confirm-scroll-list rlh-overflow-y-auto rlh-max-h-48">
+      <div class="rlh-confirm-scroll-list">
         ${listHtml}
       </div>
       ${booksOnlyHtml}

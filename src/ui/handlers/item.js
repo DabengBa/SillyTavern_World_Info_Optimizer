@@ -390,6 +390,10 @@ export function createItemHandlers(deps = {}) {
     $content.attr('data-entry-mode', 'view');
     $container.removeClass('rlh-editing');
     updateRenameButtonState($container, 'view');
+    const $nameSpan = $container.find('.rlh-item-name').first();
+    if ($nameSpan.length) {
+      $nameSpan.show().removeAttr('aria-hidden');
+    }
     if (!$content.is(':visible')) {
       if (animate) $content.slideDown(200);
       else $content.show();
@@ -409,6 +413,10 @@ export function createItemHandlers(deps = {}) {
     $content.attr('data-entry-mode', 'edit');
     $container.addClass('rlh-editing');
     updateRenameButtonState($container, 'edit');
+    const $nameSpan = $container.find('.rlh-item-name').first();
+    if ($nameSpan.length) {
+      $nameSpan.hide().attr('aria-hidden', 'true');
+    }
     if (!$content.is(':visible')) {
       if (animate) $content.slideDown(200, bindInputs);
       else {
@@ -590,22 +598,19 @@ export function createItemHandlers(deps = {}) {
       $header.append(renameUIHtml);
     }
 
-    $nameSpan.attr('aria-hidden', 'true').hide();
     $header.find('.rlh-rename-input').focus().select();
   });
   const exitRenameMode = ($container, newName = null) => {
-  const $header = $container.find('.rlh-item-header').first();
-  const $nameSpan = $header.find('.rlh-item-name').first();
-  if (newName) {
-    $nameSpan.text(newName);
-  }
-  $header.find('.rlh-rename-ui').remove();
-  if ($container.attr('data-entry-mode') === 'edit') {
-    $nameSpan.hide().attr('aria-hidden', 'true');
-  } else {
-    $nameSpan.show().removeAttr('aria-hidden');
-  }
-  $container.removeClass('renaming');
+    const $header = $container.find('.rlh-item-header').first();
+    const $nameSpan = $header.find('.rlh-item-name').first();
+    if (newName) {
+      $nameSpan.text(newName);
+    }
+    $header.find('.rlh-rename-ui').remove();
+    if ($nameSpan.length && $container.attr('data-entry-mode') !== 'edit') {
+      $nameSpan.show().removeAttr('aria-hidden');
+    }
+    $container.removeClass('renaming');
   };
   const handleConfirmRename = errorCatched(async event => {
     event.stopPropagation();
