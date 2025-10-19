@@ -21,6 +21,8 @@ export const SORT_MENU_ID = 'rlh-sort-menu';
 export const SORT_MENU_BUTTON_ID = 'rlh-sort-menu-btn';
 export const POSITION_MENU_ID = 'rlh-position-menu';
 export const POSITION_MENU_BUTTON_ID = 'rlh-position-menu-btn';
+export const UNIFIED_STATUS_MENU_ID = 'rlh-unified-status-menu';
+export const UNIFIED_STATUS_BUTTON_ID = 'rlh-unified-status-btn';
 export const CREATE_LOREBOOK_BTN_ID = 'rlh-create-primary-btn';
 export const CHARACTER_BOOK_SWITCH_ID = 'rlh-character-book-switch';
 export const PREFETCH_INDICATOR_ID = 'rlh-prefetch-indicator';
@@ -30,6 +32,121 @@ export const DOM_ID = {
   TOOLBAR_SHELL: 'regex-lore-hub-toolbar-shell',
   TOGGLE_TOOLBAR_BTN: 'regex-lore-hub-toggle-toolbar-btn',
 };
+
+const normalizeUrlBase = value => {
+  if (!value || typeof value !== 'string') return '';
+  return value.replace(/\\/g, '/').replace(/\/+$/, '');
+};
+
+const computeDefaultModuleRoot = () => {
+  try {
+    const baseUrl = new URL('./', import.meta.url).href;
+    return normalizeUrlBase(baseUrl);
+  } catch (error) {
+    console.warn('[RegexLoreHub] 无法解析脚本根路径：', error);
+    return '';
+  }
+};
+
+const detectRootFromParent = () => {
+  try {
+    const parentWin = window.parent || window;
+    const parentDoc = parentWin?.document;
+    if (!parentDoc) return '';
+
+    const scripts = parentDoc.querySelectorAll('script[src]');
+    for (const scriptEl of scripts) {
+      const src = scriptEl.getAttribute('src');
+      if (!src || !/regex[-_]lore[-_]hub/i.test(src)) continue;
+
+      try {
+        const absoluteUrl = new URL(src, parentWin.location?.href || window.location.href);
+        const normalized = normalizeUrlBase(absoluteUrl.href);
+        if (!normalized) continue;
+        const trimmed = normalized.replace(/\/[^/]*$/, '');
+        if (trimmed) return trimmed;
+      } catch (innerError) {
+        console.warn('[RegexLoreHub] 宿主脚本根路径解析失败：', innerError);
+      }
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 无法从宿主 DOM 推断根路径：', error);
+  }
+  return '';
+};
+
+const RLH_ROOT_URL = normalizeUrlBase(detectRootFromParent()) || computeDefaultModuleRoot();
+
+const WORLD_BOOK_STATUS_DEFINITIONS = [
+  {
+    id: 'constant',
+    label: '永久激活',
+    shortLabel: '永久',
+    description: '忽略关键词限制，只要条目启用且满足概率就始终尝试激活。',
+    strategyType: 'constant',
+    toastLabel: '永久激活',
+    accentVar: '--rlh-status-constant',
+    badgeClass: 'rlh-status-badge--constant',
+    order: 0,
+  },
+  {
+    id: 'selective',
+    label: '关键词触发',
+    shortLabel: '关键词',
+    description: '匹配主要/次要关键词后激活，可结合概率与扫描深度控制触发。',
+    strategyType: 'selective',
+    toastLabel: '关键词触发',
+    accentVar: '--rlh-status-selective',
+    badgeClass: 'rlh-status-badge--selective',
+    order: 1,
+  },
+  {
+    id: 'vectorized',
+    label: '向量化',
+    shortLabel: '向量',
+    description: '依赖向量相似度激活，适用于语义召回场景。',
+    strategyType: 'vectorized',
+    toastLabel: '向量化',
+    accentVar: '--rlh-status-vectorized',
+    badgeClass: 'rlh-status-badge--vectorized',
+    order: 2,
+  },
+];
+
+const normalizedStatusDefinitions = WORLD_BOOK_STATUS_DEFINITIONS.map(def =>
+  Object.freeze({
+    ...def,
+    id: String(def.id).toLowerCase(),
+    strategyType: String(def.strategyType ?? def.id).toLowerCase(),
+    toastLabel: def.toastLabel ?? def.label,
+    shortLabel: def.shortLabel ?? def.label,
+  }),
+);
+
+const statusMap = {};
+normalizedStatusDefinitions.forEach(def => {
+  statusMap[def.id] = def;
+  statusMap[def.strategyType] = def;
+});
+
+export const WORLD_BOOK_STATUS_MAP = Object.freeze(statusMap);
+export const WORLD_BOOK_STATUS_LIST = Object.freeze([...normalizedStatusDefinitions].sort((a, b) => a.order - b.order));
+export const DEFAULT_WORLD_BOOK_STATUS = WORLD_BOOK_STATUS_MAP.constant;
+export const DEFAULT_STATUS_ID = DEFAULT_WORLD_BOOK_STATUS?.id ?? 'constant';
+
+export const normalizeWorldbookStatusId = value => {
+  if (!value && value !== 0) return null;
+  const key = String(value).trim().toLowerCase();
+  return WORLD_BOOK_STATUS_MAP[key]?.id ?? null;
+};
+
+export const resolveWorldbookStatus = statusId => {
+  const normalized = normalizeWorldbookStatusId(statusId);
+  return normalized ? WORLD_BOOK_STATUS_MAP[normalized] ?? null : null;
+};
+
+export const resolveWorldbookStatusByStrategy = strategyType =>
+  resolveWorldbookStatus(strategyType);
 
 export const LOREBOOK_OPTIONS = {
   position: {
@@ -105,6 +222,11 @@ export const appState = {
   saveStatus: 'idle',
   saveRetryAttempt: 0,
   isToolbarCollapsed: true,
+  isDragSortDisabled: false,
+  paths: {
+    rlhRoot: RLH_ROOT_URL,
+    vendor: RLH_ROOT_URL ? `${RLH_ROOT_URL}/vendor` : '',
+  },
 };
 
 export const safeGetLorebookEntries = bookName => {
@@ -404,11 +526,4 @@ export const UI_TEXTS = {
   INSERT_RULES_TITLE: '插入规则',
   // ... 未来可以添加更多UI文本
 };
-
-
-
-
-
-
-
 

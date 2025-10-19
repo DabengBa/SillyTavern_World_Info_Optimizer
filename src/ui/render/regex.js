@@ -106,7 +106,19 @@ export const renderRegexView = (context, itemList, searchTerm, $container, title
   });
 
   const listEl = $listContainer[0];
-  if (canReorder && listEl && parentWin.Sortable) {
+  const dragNoticeClass = 'rlh-drag-disabled-banner';
+  $container.find(`.${dragNoticeClass}`).remove();
+
+  if (canReorder && appState.isDragSortDisabled) {
+    $listContainer.attr('data-drag-disabled', 'true');
+    $container.prepend(
+      `<p class="rlh-info-text-small ${dragNoticeClass}">提示：拖拽排序功能暂时不可用，请使用按钮调整顺序。</p>`,
+    );
+  } else {
+    $listContainer.removeAttr('data-drag-disabled');
+  }
+
+  if (canReorder && !appState.isDragSortDisabled && listEl && parentWin.Sortable) {
     const sortable = parentWin.Sortable.create(listEl, {
       animation: 150,
       handle: '.rlh-drag-handle',

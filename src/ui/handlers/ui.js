@@ -22,6 +22,11 @@ import {
   SORT_MENU_BUTTON_ID,
   POSITION_MENU_ID,
   POSITION_MENU_BUTTON_ID,
+  UNIFIED_STATUS_MENU_ID,
+  UNIFIED_STATUS_BUTTON_ID,
+  WORLD_BOOK_STATUS_LIST,
+  DEFAULT_WORLD_BOOK_STATUS,
+  resolveWorldbookStatus,
 } from '../../core.js';
 
 import {
@@ -34,13 +39,20 @@ import {
   updateBookSummary,
   normalizeWorldbookEntry,
   updateWorldbookEntries,
+  updateWorldbookEntriesStatus,
   updateRegexOrderMetadata,
 } from '../../dataLayer.js';
 
 import { renderContent, getViewContext, getContextInstanceKey } from '../render/index.js';
 import { getGlobalLorebookMatches } from '../render/lorebook.js';
 import { getRegexMatches } from '../render/regex.js';
-import { updateSelectionCount, setActiveCollapseState, setActiveSortMode, buildReplaceConfirmationHTML } from '../render/shared.js';
+import {
+  updateSelectionCount,
+  setActiveCollapseState,
+  setActiveSortMode,
+  buildReplaceConfirmationHTML,
+  updateEntryStatusDom,
+} from '../render/shared.js';
 
 /**
  * 显示一个确认弹窗，详细列出将被替换的世界书及其条目。
@@ -148,6 +160,170 @@ export function createUIHandlers(deps = {}) {
     return { type, raw: remainder };
   };
 
+  const getUnifiedStatusElements = () => ({
+    $menu: $(`#${UNIFIED_STATUS_MENU_ID}`, parentDoc),
+    $button: $(`#${UNIFIED_STATUS_BUTTON_ID}`, parentDoc),
+  });
+
+  const getSelectedEntriesByBook = () => {
+    const selectedEntriesByBook = new Map();
+    for (const itemKey of appState.selectedItems) {
+      const { type, bookName, entryId } = parseSelectionKey(itemKey);
+      if (type === 'lore' && bookName) {
+        const numericId = Number(entryId);
+        const uid = Number.isFinite(numericId) ? numericId : entryId;
+        if (uid === null || uid === undefined || uid === '') continue;
+        if (!selectedEntriesByBook.has(bookName)) selectedEntriesByBook.set(bookName, []);
+        selectedEntriesByBook.get(bookName).push(uid);
+      }
+    }
+    return selectedEntriesByBook;
+  };
+
+  let unifiedStatusMenuListenersActive = false;
+
+  function closeUnifiedStatusMenu() {
+    const { $menu, $button } = getUnifiedStatusElements();
+    if ($menu.length) {
+      $menu.attr('data-open', 'false');
+    }
+    if ($button.length) {
+      $button.attr('aria-expanded', 'false');
+    }
+    if (unifiedStatusMenuListenersActive) {
+      $(parentDoc).off('click.rlhUnifiedStatus', handleUnifiedStatusMenuOutsideClick);
+      unifiedStatusMenuListenersActive = false;
+    }
+  }
+
+  function handleUnifiedStatusMenuOutsideClick(event) {
+    const { $menu, $button } = getUnifiedStatusElements();
+    if (!$menu.length) return;
+    const $target = $(event.target);
+    if ($target.closest(`#${UNIFIED_STATUS_MENU_ID}`).length) return;
+    if ($button.length && $target.closest(`#${UNIFIED_STATUS_BUTTON_ID}`).length) return;
+    closeUnifiedStatusMenu();
+  }
+
+  function openUnifiedStatusMenu() {
+    const { $menu, $button } = getUnifiedStatusElements();
+    if (!$menu.length || !$button.length) return;
+    $menu.attr('data-open', 'true');
+    $button.attr('aria-expanded', 'true');
+    if (!unifiedStatusMenuListenersActive) {
+      $(parentDoc).on('click.rlhUnifiedStatus', handleUnifiedStatusMenuOutsideClick);
+      unifiedStatusMenuListenersActive = true;
+    }
+  }
+
+  const updateUnifiedStatusButtonState = () => {
+    const { $menu, $button } = getUnifiedStatusElements();
+    if (!$button.length) return;
+    const context = getViewContext();
+    const isEntryContext = context?.type === 'lore';
+    if (!isEntryContext) {
+      $button.attr('disabled', 'disabled').attr('title', '统一状态仅在条目视图可用');
+      if ($menu.length && $menu.attr('data-open') === 'true') closeUnifiedStatusMenu();
+      return;
+    }
+
+    const fallbackNames = [
+      context?.activeBookName,
+      appState.activeBookName,
+      appState.activeCharacterBook,
+      appState.chatLorebook,
+    ];
+    let resolvedBookName =
+      fallbackNames.find(name => typeof name === 'string' && name.trim().length > 0)?.toString().trim() ?? '';
+
+    const selectedEntriesMap = getSelectedEntriesByBook();
+    if (!resolvedBookName && selectedEntriesMap.size === 1) {
+      resolvedBookName = [...selectedEntriesMap.keys()][0] ?? '';
+    }
+    const entries = resolvedBookName ? safeGetLorebookEntries(resolvedBookName) : [];
+    const hasEntries = entries.length > 0;
+
+    const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    let selectedTotal = 0;
+    selectedEntriesMap.forEach(list => {
+      if (Array.isArray(list)) selectedTotal += list.length;
+    });
+    const shouldEnable = isEntryMultiSelect ? selectedTotal > 0 : hasEntries;
+
+    let tooltip;
+    if (isEntryMultiSelect) {
+      tooltip = selectedTotal > 0
+        ? `多选模式：将对已选中的 ${selectedTotal} 个条目统一状态`
+        : '已开启多选，请先勾选要调整状态的条目';
+    } else if (hasEntries) {
+      tooltip = `将对「${resolvedBookName || '当前世界书'}」的所有条目统一状态`;
+    } else {
+      tooltip = resolvedBookName ? `「${resolvedBookName}」暂无条目可调整` : '请先打开需要统一状态的世界书';
+    }
+
+    $button.attr('title', tooltip);
+    if (shouldEnable) {
+      $button.removeAttr('disabled');
+    } else {
+      $button.attr('disabled', 'disabled');
+      if ($menu.length && $menu.attr('data-open') === 'true') closeUnifiedStatusMenu();
+    }
+  };
+
+  const updatePositionButtonState = () => {
+    const { $menu, $button } = getPositionMenuElements();
+    if (!$button.length) return;
+    const context = getViewContext();
+
+    const fallbackNames = [
+      context?.activeBookName,
+      appState.activeBookName,
+      appState.activeCharacterBook,
+      appState.chatLorebook,
+    ];
+    let resolvedBookName =
+      fallbackNames.find(name => typeof name === 'string' && name.trim().length > 0)?.toString().trim() ?? '';
+
+    const selectedEntriesMap = getSelectedEntriesByBook();
+    if (!resolvedBookName && selectedEntriesMap.size === 1) {
+      resolvedBookName = [...selectedEntriesMap.keys()][0] ?? '';
+    }
+
+    const entries = resolvedBookName ? safeGetLorebookEntries(resolvedBookName) : [];
+    const hasEntries = entries.length > 0;
+    const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    let selectedTotal = 0;
+    selectedEntriesMap.forEach(list => {
+      if (Array.isArray(list)) selectedTotal += list.length;
+    });
+    const shouldEnable = isEntryMultiSelect ? selectedTotal > 0 : hasEntries;
+
+    let tooltip;
+    if (isEntryMultiSelect) {
+      tooltip = selectedTotal > 0
+        ? `多选模式：将对已选中的 ${selectedTotal} 个条目统一位置`
+        : '已开启多选，请先勾选要调整位置的条目';
+    } else if (hasEntries) {
+      tooltip = `将对「${resolvedBookName || '当前世界书'}」的所有条目统一位置`;
+    } else {
+      tooltip = resolvedBookName ? `「${resolvedBookName}」暂无条目可调整` : '请先打开需要统一位置的世界书';
+    }
+
+    $button.attr('title', tooltip);
+    if (shouldEnable) {
+      $button.removeAttr('disabled');
+    } else {
+      $button.attr('disabled', 'disabled');
+      if ($menu.length) $menu.attr('data-open', 'false');
+    }
+  };
+
+  const syncToolbarState = () => {
+    updateSelectionCount();
+    updateUnifiedStatusButtonState();
+    updatePositionButtonState();
+  };
+
   const getVisibleSelectKeys = () => {
     if (!appState.multiSelectMode) return [];
     const $panel = $(`#${PANEL_ID}`, parentDoc);
@@ -222,7 +398,7 @@ export function createUIHandlers(deps = {}) {
       $container.addClass('selected');
       $container.find('.rlh-multi-select-checkbox').prop('checked', true);
     }
-    updateSelectionCount();
+    syncToolbarState();
     return true;
   };
 
@@ -534,6 +710,7 @@ export function createUIHandlers(deps = {}) {
   const handlePositionMenuToggle = errorCatched(async event => {
     event.preventDefault();
     event.stopPropagation();
+    syncToolbarState();
     const { $menu } = getPositionMenuElements();
     if (!$menu.length) return;
     const isOpen = $menu.attr('data-open') === 'true';
@@ -555,6 +732,201 @@ export function createUIHandlers(deps = {}) {
     if (lorebookHandlers?.applyUnifiedPosition) {
       await lorebookHandlers.applyUnifiedPosition({ bookName, positionValue });
     }
+  });
+
+  const handleUnifiedStatusMenuToggle = errorCatched(async event => {
+    event.preventDefault();
+    event.stopPropagation();
+    syncToolbarState();
+    const { $menu, $button } = getUnifiedStatusElements();
+    if (!$menu.length || !$button.length) return;
+    if ($button.is(':disabled')) return;
+    const isOpen = $menu.attr('data-open') === 'true';
+    if (isOpen) closeUnifiedStatusMenu();
+    else openUnifiedStatusMenu();
+  });
+
+  const handleUnifiedStatusOptionSelect = errorCatched(async event => {
+    event.preventDefault();
+    const $option = $(event.currentTarget);
+    const statusId = ($option.data('status-id') ?? '').toString().trim();
+    if (!statusId) return;
+    closeUnifiedStatusMenu();
+
+    const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    let entriesByBook = getSelectedEntriesByBook();
+
+    if (isEntryMultiSelect && entriesByBook.size === 0) {
+      await showModal({ type: 'alert', title: '提示', text: '请至少选择一个已保存的条目。' });
+      syncToolbarState();
+      return;
+    }
+
+    if (!isEntryMultiSelect) {
+      const context = getViewContext();
+      const fallbackNames = [
+        context?.activeBookName,
+        appState.activeBookName,
+        appState.activeCharacterBook,
+        appState.chatLorebook,
+      ];
+      const resolvedBookName =
+        fallbackNames.find(name => typeof name === 'string' && name.trim().length > 0)?.toString().trim() ?? '';
+      if (!resolvedBookName) {
+        await showModal({ type: 'alert', title: '提示', text: '请先打开一个世界书以便执行统一状态。' });
+        syncToolbarState();
+        return;
+      }
+      let entries = [...safeGetLorebookEntries(resolvedBookName)];
+      if (!entries.length) {
+        await loadLorebookEntriesIfNeeded(resolvedBookName);
+        entries = [...safeGetLorebookEntries(resolvedBookName)];
+      }
+      if (!entries.length) {
+        await showModal({ type: 'alert', title: '提示', text: `「${resolvedBookName}」暂无条目可操作。` });
+        syncToolbarState();
+        return;
+      }
+      const uids = [];
+      entries.forEach(entry => {
+        const numericUid = Number(entry?.uid);
+        if (Number.isFinite(numericUid)) uids.push(numericUid);
+      });
+      if (!uids.length) {
+        await showModal({ type: 'alert', title: '提示', text: '当前没有已保存的条目可操作。' });
+        syncToolbarState();
+        return;
+      }
+      entriesByBook = new Map([[resolvedBookName, uids]]);
+    }
+
+    const statusMeta = resolveWorldbookStatus(statusId) ?? DEFAULT_WORLD_BOOK_STATUS;
+    const toastLabel = statusMeta.toastLabel ?? statusMeta.label;
+    const totalTargets = Array.from(entriesByBook.values()).reduce((sum, list) => sum + list.length, 0);
+    const progressToast = showProgressToast(`正在更新 ${totalTargets} 个条目的状态...`);
+
+    let appliedCount = 0;
+    let alreadyCount = 0;
+    let failedCount = 0;
+    let ignoredCount = 0;
+    let unsavedCount = 0;
+    const failureDetails = [];
+
+    try {
+      const viewContext = getViewContext();
+      let processedBooks = 0;
+      for (const [bookName, entryIds] of entriesByBook.entries()) {
+        processedBooks += 1;
+        progressToast.update(`正在更新「${bookName}」 (${processedBooks}/${entriesByBook.size})`);
+        const result = await updateWorldbookEntriesStatus(bookName, entryIds, statusMeta.id, {
+          context: viewContext?.id ?? 'unknown',
+        }).catch(error => {
+          console.error('[RegexLoreHub] 批量状态更新异常:', error);
+          failureDetails.push({ bookName, reason: error?.message ?? '未知错误' });
+          failedCount += entryIds.length;
+          return null;
+        });
+
+        if (!result) {
+          continue;
+        }
+
+        const summary = result.summary ?? {
+          appliedCount: 0,
+          alreadyAppliedCount: 0,
+          failedCount: 0,
+          ignoredCount: 0,
+          ignoredUnsavedCount: 0,
+        };
+
+        appliedCount += summary.appliedCount ?? 0;
+        alreadyCount += summary.alreadyAppliedCount ?? 0;
+        failedCount += summary.failedCount ?? 0;
+        ignoredCount += summary.ignoredCount ?? 0;
+        unsavedCount += summary.ignoredUnsavedCount ?? 0;
+
+        if (Array.isArray(result.failed)) {
+          result.failed.forEach(record => {
+            failureDetails.push({
+              bookName,
+              name: record.name ?? `#${record.uid ?? record.tempUid ?? '未知'}`,
+              reason: record.reason ?? '未说明',
+            });
+          });
+        }
+
+        if (Array.isArray(result.ignored)) {
+          result.ignored
+            .filter(record => record.reason && record.reason !== 'UNSAVED_ENTRY')
+            .forEach(record => {
+              failureDetails.push({
+                bookName,
+                name: record.name ?? `#${record.uid ?? record.tempUid ?? '未知'}`,
+                reason: record.reason,
+              });
+            });
+        }
+
+        if (Array.isArray(result.success)) {
+          result.success.forEach(record => {
+            const targetUid = record.uid ?? record.tempUid;
+            if (targetUid != null) {
+              updateEntryStatusDom(bookName, targetUid, statusMeta.id);
+            }
+          });
+        }
+      }
+    } finally {
+      progressToast.remove();
+    }
+
+    const ignoredOtherCount = Math.max(ignoredCount - unsavedCount, 0);
+
+    let message = '';
+    if (
+      appliedCount > 0
+      && failedCount === 0
+      && unsavedCount === 0
+      && ignoredOtherCount === 0
+    ) {
+      message = `${appliedCount} 个条目的状态已更新为「${toastLabel}」`;
+      if (alreadyCount > 0) {
+        message += `（其中 ${alreadyCount} 个原本已处于该状态）`;
+      }
+    } else {
+      const parts = [];
+      if (appliedCount > 0) {
+        parts.push(`${appliedCount} 个条目更新为「${toastLabel}」`);
+      }
+      if (alreadyCount > 0) {
+        parts.push(`${alreadyCount} 个原本已处于该状态`);
+      }
+      if (failedCount > 0) {
+        parts.push(`${failedCount} 个条目更新失败`);
+      }
+      if (unsavedCount > 0) {
+        parts.push(`忽略 ${unsavedCount} 个未保存条目`);
+      }
+      if (ignoredOtherCount > 0) {
+        parts.push(`跳过 ${ignoredOtherCount} 个条目`);
+      }
+      message = parts.length > 0 ? parts.join('；') : '未执行任何状态更新，请确认已选择有效条目。';
+    }
+
+    let toastType = 'success';
+    if (failedCount > 0) {
+      toastType = appliedCount > 0 ? 'warning' : 'error';
+    } else if (unsavedCount > 0 || ignoredOtherCount > 0) {
+      toastType = 'info';
+    }
+
+    showToast(message, toastType);
+
+    if (failureDetails.length) {
+      console.warn('[RegexLoreHub] 状态更新详情（仅日志）:', failureDetails);
+    }
+
+    syncToolbarState();
   });
 
 
@@ -580,7 +952,7 @@ export function createUIHandlers(deps = {}) {
     if (isChecked) appState.selectedItems.add(selectKey);
     else appState.selectedItems.delete(selectKey);
     $checkbox.closest('[data-select-key]').toggleClass('selected', isChecked);
-    updateSelectionCount();
+    syncToolbarState();
   });
 
 
@@ -802,7 +1174,8 @@ const handleTabRefresh = errorCatched(async tabId => {
   $(`#rlh-multi-select-btn`, parentDoc).toggleClass('active', appState.multiSelectMode);
   $(`#rlh-multi-select-controls`, parentDoc).toggleClass('active', appState.multiSelectMode);
   renderContent();
-  });
+  syncToolbarState();
+});
 
 
 
@@ -812,7 +1185,8 @@ const handleTabRefresh = errorCatched(async tabId => {
   if (!keys.length) return;
   keys.forEach(key => appState.selectedItems.add(key));
   renderContent();
-  });
+  syncToolbarState();
+});
 
 
 
@@ -833,8 +1207,11 @@ const handleTabRefresh = errorCatched(async tabId => {
       }
     });
   }
-  if (changed) renderContent();
-  });
+  if (changed) {
+    renderContent();
+    syncToolbarState();
+  }
+});
 
 
 
@@ -847,7 +1224,8 @@ const handleTabRefresh = errorCatched(async tabId => {
     else appState.selectedItems.add(key);
   });
   renderContent();
-  });
+  syncToolbarState();
+});
 
 
 
@@ -1405,6 +1783,10 @@ const handleTabRefresh = errorCatched(async tabId => {
     handlePositionMenuToggle,
 
     handlePositionOptionSelect,
+
+    handleUnifiedStatusMenuToggle,
+
+    handleUnifiedStatusOptionSelect,
 
     handleCharacterBookSwitch,
 

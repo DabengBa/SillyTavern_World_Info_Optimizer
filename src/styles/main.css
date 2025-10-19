@@ -24,6 +24,9 @@
     --rlh-red: #ef4444;
     --rlh-green-bg: color-mix(in srgb, var(--rlh-green) 18%, transparent);
     --rlh-red-bg: color-mix(in srgb, var(--rlh-red) 18%, transparent);
+    --rlh-status-constant: #22c55e;
+    --rlh-status-selective: #3b82f6;
+    --rlh-status-vectorized: #a855f7;
   }
 
   #regex-lore-hub-panel.dark {
@@ -42,6 +45,9 @@
     --rlh-red: #fb7185;
     --rlh-green-bg: color-mix(in srgb, var(--rlh-green) 20%, transparent);
     --rlh-red-bg: color-mix(in srgb, var(--rlh-red) 20%, transparent);
+    --rlh-status-constant: #34d399;
+    --rlh-status-selective: #60a5fa;
+    --rlh-status-vectorized: #c084fc;
   }
 
   @keyframes rlhFadeInUp {
@@ -679,7 +685,7 @@
     background: transparent;
     padding: 0.4rem 0.6rem;
     color: inherit;
-    font-size: 0.92rem;
+    font-size: 1rem;
   }
 
   .rlh-search-field .rlh-search-input:focus {
@@ -747,6 +753,68 @@
     margin-left: auto;
     width: auto;
     min-width: 0;
+  }
+
+  .rlh-unified-status {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .rlh-unified-status-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 12rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 60%, transparent);
+    background: color-mix(in srgb, var(--rlh-surface-color) 95%, transparent);
+    box-shadow: 0 24px 60px -28px var(--rlh-shadow-color);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(0, 8px, 0);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 30;
+  }
+
+  .rlh-unified-status[data-open="true"] .rlh-unified-status-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .rlh-unified-status-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.6rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease;
+  }
+
+  .rlh-unified-status-option:hover,
+  .rlh-unified-status-option:focus-visible {
+    background: color-mix(in srgb, var(--rlh-hover-bg) 75%, transparent);
+    outline: none;
+  }
+
+  .rlh-unified-status-option__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
   }
 
   .rlh-sort-menu-list,
@@ -1195,7 +1263,7 @@
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
     background-color: var(--rlh-input-bg);
     color: var(--rlh-text-color);
-    font-size: 0.92rem;
+    font-size: 1rem;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
@@ -1466,6 +1534,50 @@
     gap: 0.5rem;
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .rlh-item-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .rlh-status-badge {
+    --badge-color: var(--rlh-accent-color);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    background: color-mix(in srgb, var(--badge-color) 18%, transparent);
+    color: color-mix(in srgb, var(--badge-color) 80%, white 5%);
+    white-space: nowrap;
+  }
+
+  .rlh-status-badge i {
+    font-size: 0.55rem;
+  }
+
+  .rlh-status-badge__text {
+    display: inline-block;
+    transform: translateY(0.5px);
+  }
+
+  .rlh-status-badge--constant {
+    --badge-color: var(--rlh-status-constant);
+  }
+
+  .rlh-status-badge--selective {
+    --badge-color: var(--rlh-status-selective);
+  }
+
+  .rlh-status-badge--vectorized {
+    --badge-color: var(--rlh-status-vectorized);
   }
 
   .rlh-item-name {

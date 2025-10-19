@@ -9,6 +9,8 @@ import {
   SORT_MENU_BUTTON_ID,
   POSITION_MENU_ID,
   POSITION_MENU_BUTTON_ID,
+  UNIFIED_STATUS_MENU_ID,
+  UNIFIED_STATUS_BUTTON_ID,
   FILTER_DEFINITIONS,
   SORT_OPTION_DEFINITIONS,
   DEFAULT_FILTER_LABELS,
@@ -22,6 +24,9 @@ import {
   errorCatched,
   safeGetLorebookEntries,
   safeSetLorebookEntries,
+  WORLD_BOOK_STATUS_LIST,
+  DEFAULT_WORLD_BOOK_STATUS,
+  resolveWorldbookStatus,
   UI_TEXTS,
 } from '../../core.js';
 import { saveAllChanges } from '../../dataLayer.js';
@@ -59,6 +64,21 @@ export const setActiveSortMode = (context, mode) => {
 };
 
 const escapeAttr = value => escapeHtml(String(value ?? ''));
+
+const resolveStatusMeta = statusId => resolveWorldbookStatus(statusId) ?? DEFAULT_WORLD_BOOK_STATUS;
+
+export const buildStatusBadge = (statusId, { shortLabel = false, withIcon = true } = {}) => {
+  const statusMeta = resolveStatusMeta(statusId);
+  const label = shortLabel ? statusMeta.shortLabel : statusMeta.label;
+  const iconHtml = withIcon ? '<i class="fa-solid fa-circle"></i>' : '';
+  return `<span class="rlh-status-badge ${statusMeta.badgeClass ?? ''}" data-status-id="${escapeAttr(statusMeta.id)}">${iconHtml}<span class="rlh-status-badge__text">${escapeHtml(label)}</span></span>`;
+};
+
+const buildUnifiedStatusOptionsHtml = () =>
+  WORLD_BOOK_STATUS_LIST.map(status => {
+    const badgeHtml = buildStatusBadge(status.id, { shortLabel: true });
+    return `<li role="presentation"><button type="button" class="rlh-unified-status-option" data-status-id="${escapeAttr(status.id)}" role="option" aria-selected="false">${badgeHtml}<span class="rlh-unified-status-option__label">${escapeHtml(status.label)}</span></button></li>`;
+  }).join('');
 
 const buildFilterCheckboxes = (context, filtersState) => {
   const filters = context.visibleFilters ?? [];
@@ -102,9 +122,40 @@ const buildSortMenu = (context, currentSort) => {
 const buildPositionMenu = context => {
   if (!context.showPositionMenu) return '';
 
-  const bookName = context.activeBookName?.toString().trim() ?? '';
+  const selectionMap = new Map();
+  appState.selectedItems.forEach(key => {
+    if (typeof key !== 'string' || !key.startsWith('lore:')) return;
+    const lastSep = key.lastIndexOf(':');
+    if (lastSep === -1) return;
+    const name = key.slice(5, lastSep);
+    const entryId = key.slice(lastSep + 1);
+    if (!entryId) return;
+    if (!selectionMap.has(name)) selectionMap.set(name, []);
+    selectionMap.get(name).push(entryId);
+  });
+
+  let bookName = context.activeBookName?.toString().trim() ?? '';
+  if (!bookName && selectionMap.size === 1) {
+    bookName = [...selectionMap.keys()][0] ?? '';
+  }
+
   const entries = bookName ? safeGetLorebookEntries(bookName) : [];
   const hasEntries = entries.length > 0;
+  const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+  const selectedForBook = bookName ? selectionMap.get(bookName) ?? [] : [];
+  const shouldEnable = Boolean(bookName) && (isEntryMultiSelect ? selectedForBook.length > 0 : hasEntries);
+  let tooltip;
+  if (!bookName) {
+    tooltip = selectionMap.size > 0 ? '多选模式：未能识别选中的条目归属，请重新选择' : '请先打开需要统一位置的世界书';
+  } else if (!hasEntries && !isEntryMultiSelect) {
+    tooltip = `「${bookName}」暂无条目可调整`;
+  } else if (isEntryMultiSelect) {
+    tooltip = selectedForBook.length > 0
+      ? `多选模式：将对已选中的 ${selectedForBook.length} 个条目统一位置`
+      : '已开启多选，请先勾选要调整位置的条目';
+  } else {
+    tooltip = `将对「${bookName}」中的所有条目统一位置`;
+  }
 
   const uniquePositions = new Set(
     entries.map(entry => (entry?.position ?? 'before_character_definition').toString()),
@@ -119,9 +170,10 @@ const buildPositionMenu = context => {
     'aria-haspopup="listbox"',
     'aria-expanded="false"',
     `aria-controls="${menuListId}"`,
+    `title="${escapeHtml(tooltip)}"`,
   ];
 
-  if (!bookName || !hasEntries) {
+  if (!shouldEnable) {
     buttonAttributes.push('disabled');
   }
 
@@ -200,6 +252,71 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
           ${multiSelectControlsHtml}
         </div>
       `;
+
+  const unifiedStatusModuleHtml =
+    context.supportsMultiSelect && context.multiSelectTarget === 'entry'
+      ? (() => {
+          const menuId = `${UNIFIED_STATUS_MENU_ID}`;
+          const listId = `${UNIFIED_STATUS_MENU_ID}-list`;
+          const optionsHtml = buildUnifiedStatusOptionsHtml();
+          const containerClasses = ['rlh-unified-status'];
+          if (appState.multiSelectMode) containerClasses.push('is-multiselect');
+          const selectionMap = new Map();
+          appState.selectedItems.forEach(key => {
+            if (typeof key !== 'string' || !key.startsWith('lore:')) return;
+            const lastSep = key.lastIndexOf(':');
+            if (lastSep === -1) return;
+            const name = key.slice(5, lastSep);
+            const entryId = key.slice(lastSep + 1);
+            if (!entryId) return;
+            if (!selectionMap.has(name)) selectionMap.set(name, []);
+            selectionMap.get(name).push(entryId);
+          });
+          const fallbackNames = [
+            context.activeBookName,
+            appState.activeBookName,
+            appState.activeCharacterBook,
+            appState.chatLorebook,
+          ];
+          let resolvedBookName =
+            fallbackNames.find(name => typeof name === 'string' && name.trim().length > 0)?.toString().trim() ?? '';
+          if (!resolvedBookName && selectionMap.size === 1) {
+            resolvedBookName = [...selectionMap.keys()][0] ?? '';
+          }
+          const entries = resolvedBookName ? safeGetLorebookEntries(resolvedBookName) : [];
+          const hasEntries = entries.length > 0;
+          const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+          const selectedForBook = resolvedBookName ? selectionMap.get(resolvedBookName) ?? [] : [];
+          const selectedTotal = Array.from(selectionMap.values()).reduce(
+            (sum, list) => sum + (Array.isArray(list) ? list.length : 0),
+            0,
+          );
+          const shouldEnable = Boolean(resolvedBookName) && (isEntryMultiSelect ? selectedForBook.length > 0 : hasEntries);
+          let tooltip;
+          if (!resolvedBookName) {
+            tooltip = selectionMap.size > 0 ? '多选模式：未能识别选中的条目归属，请重新选择' : '请先打开需要统一状态的世界书';
+          } else if (!hasEntries && !isEntryMultiSelect) {
+            tooltip = `「${resolvedBookName}」暂无条目可调整`;
+          } else if (isEntryMultiSelect) {
+            tooltip =
+              selectedForBook.length > 0
+                ? `多选模式：将对已选中的 ${selectedForBook.length} 个条目统一状态`
+                : '已开启多选，请先勾选要调整状态的条目';
+          } else {
+            tooltip = `将对「${resolvedBookName || '当前世界书'}」的所有条目统一状态`;
+          }
+          return `
+            <div class="${containerClasses.join(' ')}" id="${menuId}" data-open="false">
+              <button type="button" id="${UNIFIED_STATUS_BUTTON_ID}" class="rlh-toolbar-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="${listId}" ${shouldEnable ? '' : 'disabled'} title="${escapeHtml(tooltip)}">
+                <i class="fa-solid fa-layer-group"></i><span>统一状态</span>
+              </button>
+              <ul class="rlh-unified-status-menu" id="${listId}" role="listbox">
+                ${optionsHtml}
+              </ul>
+            </div>
+          `;
+        })()
+      : '';
 
   let collapseButtonHtml = '';
   if (context.showCollapseToggle) {
@@ -317,6 +434,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
     context.showCollapseToggle ? collapseButtonHtml : '',
     recursionButtonHtml,
     fixKeywordsButtonHtml,
+    unifiedStatusModuleHtml,
     positionMenuHtml,
     sortMenuHtml,
   ].filter(Boolean);
@@ -341,6 +459,36 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
   `;
 
   $toolbar.html(toolbarHtml);
+
+  if (context.supportsMultiSelect && context.multiSelectTarget === 'entry') {
+    const fallbackNames = [
+      context.activeBookName,
+      appState.activeBookName,
+      appState.activeCharacterBook,
+      appState.chatLorebook,
+    ];
+    const resolvedBookName =
+      fallbackNames.find(name => typeof name === 'string' && name.trim().length > 0)?.toString().trim() ?? '';
+    const entries = resolvedBookName ? safeGetLorebookEntries(resolvedBookName) : [];
+    const hasEntries = entries.length > 0;
+    const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    const hasSelection =
+      isEntryMultiSelect &&
+      entries.length > 0 &&
+      [...appState.selectedItems].some(key => key.startsWith(`lore:${resolvedBookName}:`));
+    const shouldEnable = hasEntries && (!isEntryMultiSelect || hasSelection);
+    const tooltip = !hasEntries
+      ? (resolvedBookName ? `「${resolvedBookName}」暂无条目可调整` : '请先打开需要统一状态的世界书')
+      : isEntryMultiSelect
+        ? (hasSelection ? '多选模式：仅对选中的条目统一状态' : '已开启多选，请先勾选要调整状态的条目')
+        : `将对「${resolvedBookName || '当前世界书'}」的所有条目统一状态`;
+    const $unifiedButton = $(`#${UNIFIED_STATUS_BUTTON_ID}`, $toolbar);
+    if ($unifiedButton.length) {
+      $unifiedButton.attr('title', tooltip);
+      if (shouldEnable) $unifiedButton.removeAttr('disabled');
+      else $unifiedButton.attr('disabled', 'disabled');
+    }
+  }
 
   $replaceContainer.empty();
 };
@@ -439,6 +587,8 @@ const convertMultilineToHtml = html => (typeof html === 'string' ? html.replace(
 const buildViewerPlaceholder = text => `<span class="rlh-viewer-empty">${escapeHtml(text)}</span>`;
 
 export const buildLoreEntryViewerHTML = (entry, searchTerm) => {
+  const statusMeta = resolveStatusMeta(entry?.statusId);
+  const statusBadgeHtml = buildStatusBadge(statusMeta.id);
   const keywords = Array.isArray(entry?.keys) ? entry.keys : [];
   const keywordsText = keywords.join(', ');
   const keywordsHtml = keywordsText
@@ -544,9 +694,13 @@ export const buildLoreEntryViewerHTML = (entry, searchTerm) => {
     { label: '防止递归', value: entry?.prevent_recursion ? '开启' : '关闭', placeholder: '关闭' },
     { label: '不可被递归', value: entry?.exclude_recursion ? '开启' : '关闭', placeholder: '关闭' },
   ], { layout: 'grid' });
+  const statusGroup = buildViewerGroup('状态', [
+    { label: '当前状态', html: statusBadgeHtml },
+  ], { layout: 'grid' });
 
   return `
     <div class="rlh-entry-viewer" data-mode="view">
+      ${statusGroup}
       ${keywordsField}
       ${contentField}
       ${insertRuleGroup}
@@ -640,6 +794,16 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
   const collapseState = options.collapseState ?? 'expanded';
   const isExpanded = options.isExpanded ?? false;
   const enableDrag = options.enableDrag ?? true;
+  const dragRequested = enableDrag && !fromCard;
+  const dragDisabled = dragRequested && appState.isDragSortDisabled;
+  const dragHandleTitle = dragDisabled ? '拖拽功能不可用：排序脚本未加载' : '拖拽排序';
+  const dragHandleDisabledAttrs = dragDisabled ? ' data-disabled="true" aria-disabled="true" style="cursor: not-allowed; opacity: 0.6;"' : '';
+  const dragHandleHtml =
+    dragRequested
+      ? `<span class="rlh-drag-handle${dragDisabled ? ' rlh-drag-handle--disabled' : ''}" title="${escapeHtml(dragHandleTitle)}"${
+          dragHandleDisabledAttrs
+        }><i class="fa-solid fa-grip-vertical"></i></span>`
+      : '';
   const selectionKey = options.selectionKey ?? (isLore ? `lore:${bookName}:${id}` : `regex:${id}`);
   const target = appState.multiSelectTarget;
   const selectionAllowed =
@@ -664,9 +828,6 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
     `;
   }
 
-  const dragHandleHtml = enableDrag && !fromCard ? '<span class="rlh-drag-handle" title="拖拽排序"><i class="fa-solid fa-grip-vertical"></i></span>'
-    : '';
-
   const selectionControl = selectionAllowed
     ? `<label class="rlh-selection-control"><input type="checkbox" class="rlh-multi-select-checkbox" data-select-key="${escapeHtml(selectionKey)}" ${isSelected ? 'checked' : ''}></label>`
     : '';
@@ -678,6 +839,8 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
     : '点击展开/编辑';
 
   const highlightedName = highlightText(name, searchTerm);
+  const statusMeta = isLore ? resolveStatusMeta(item.statusId) : null;
+  const statusBadgeHtml = isLore ? buildStatusBadge(statusMeta.id, { shortLabel: true }) : '';
 
   let metaHtml = '';
   if (isLore) {
@@ -700,13 +863,19 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
         `;
   }
 
+  const dragStateAttr = dragRequested
+    ? ` data-drag-enabled="${dragDisabled ? 'false' : 'true'}"${dragDisabled ? ' data-drag-disabled="true"' : ''}`
+    : '';
   const $element = $(
-    `<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"` : ''} data-select-key="${escapeHtml(selectionKey)}">
+    `<div class="rlh-item-container ${fromCard ? 'from-card' : ''}" data-type="${type}" data-id="${id}" ${isLore ? `data-book-name="${escapeHtml(bookName)}"` : ''} data-select-key="${escapeHtml(selectionKey)}"${isLore ? ` data-status-id="${escapeAttr(statusMeta.id)}"` : ''}${dragStateAttr}>
       <div class="rlh-item-header" title="${headerTitle}">
         ${selectionControl}
         ${dragHandleHtml}
         <div class="rlh-item-header-main">
-          <span class="rlh-item-name">${highlightedName}</span>
+          <div class="rlh-item-title-row">
+            <span class="rlh-item-name">${highlightedName}</span>
+            ${statusBadgeHtml}
+          </div>
           ${metaHtml}
         </div>
         <div class="rlh-item-controls">${controlsHtml}</div>
@@ -758,7 +927,7 @@ export const prependEntry = (entry, bookName) => {
   if ($listWrapper.length > 0) {
     $listWrapper.find('.rlh-info-text').remove();
 
-    const $newEntryDom = createItemElement(entry, 'lore', bookName, '', { isExpanded: true });
+    const $newEntryDom = createItemElement(entry, 'lore', bookName, '', { isExpanded: true, enableDrag: false });
     $listWrapper.prepend($newEntryDom);
     return $newEntryDom;
   }
@@ -769,6 +938,60 @@ export const updateSelectionCount = () => {
   const $ = get$();
   const parentDoc = getParentDoc();
   $(`#rlh-selection-count`, parentDoc).text(`已选择: ${appState.selectedItems.size}`);
+};
+
+export const updateEntryStatusDom = (bookName, entryId, statusId) => {
+  const $ = get$();
+  const parentDoc = getParentDoc();
+  const hasEntryId = entryId !== undefined && entryId !== null;
+  const numericIdCandidate = hasEntryId ? Number(entryId) : NaN;
+  const isNumericTarget = Number.isInteger(numericIdCandidate);
+
+  const matchEntryId = candidate => {
+    if (candidate === undefined || candidate === null) return false;
+    if (isNumericTarget) {
+      const numericCandidate = Number(candidate);
+      if (Number.isInteger(numericCandidate)) return numericCandidate === numericIdCandidate;
+    }
+    return String(candidate) === String(entryId);
+  };
+
+  const $container = $('.rlh-item-container[data-type="lore"]', parentDoc)
+    .filter((_, el) => {
+      const $el = $(el);
+      const candidateBook = $el.data('book-name') ?? $el.attr('data-book-name');
+      if (String(candidateBook) !== String(bookName)) return false;
+      const candidateId = $el.data('id');
+      if (matchEntryId(candidateId)) return true;
+      return matchEntryId($el.attr('data-id'));
+    })
+    .first();
+
+  if (!$container.length) return;
+
+  const statusMeta = resolveStatusMeta(statusId);
+  const badgeHtml = buildStatusBadge(statusMeta.id, { shortLabel: true });
+  $container.attr('data-status-id', statusMeta.id);
+
+  const $titleRow = $container.find('.rlh-item-title-row').first();
+  if ($titleRow.length) {
+    const $existingBadge = $titleRow.find('.rlh-status-badge').first();
+    if ($existingBadge.length) {
+      $existingBadge.replaceWith(badgeHtml);
+    } else {
+      $titleRow.append(badgeHtml);
+    }
+  }
+
+  const $content = $container.find('.rlh-collapsible-content');
+  if ($content.length && $container.attr('data-entry-mode') === 'view') {
+    const entries = safeGetLorebookEntries(bookName);
+    const targetEntry = entries.find(entry => Number(entry?.uid) === numericId);
+    if (targetEntry) {
+      const viewerHtml = buildLoreEntryViewerHTML(targetEntry, $container.data('searchTerm') ?? '');
+      $content.html(viewerHtml);
+    }
+  }
 };
 
 export const buildReplaceConfirmationHTML = (matches, stats, booksMatchedByNameOnly, searchTerm, replaceTerm, context) => {
@@ -921,12 +1144,39 @@ const reorderLoreEntriesInState = (bookName, orderedIds) => {
 
 export const initializeLoreEntrySortable = ($listWrapper, bookName, options = {}) => {
   const parentWin = getParentWin();
-  const enabled = options.enabled ?? false;
-  if (!enabled || !$listWrapper?.length || !parentWin?.Sortable) return;
+  const dragRequested = options.enabled ?? false;
+  const hasWrapper = !!$listWrapper?.length;
+
+  const markDragDisabled = () => {
+    if (!hasWrapper) return;
+    $listWrapper.attr('data-drag-disabled', 'true');
+    if (!$listWrapper.find('.rlh-drag-disabled-tip').length) {
+      $listWrapper.prepend('<p class="rlh-info-text-small rlh-drag-disabled-tip">拖拽排序功能暂时不可用。</p>');
+    }
+  };
+
+  if (!dragRequested || !hasWrapper) {
+    if (hasWrapper) {
+      $listWrapper.removeAttr('data-drag-disabled');
+      $listWrapper.find('.rlh-drag-disabled-tip').remove();
+    }
+    return;
+  }
+
+  if (appState.isDragSortDisabled) {
+    markDragDisabled();
+    return;
+  }
+
+  if (!parentWin?.Sortable) return;
+
   const listEl = $listWrapper[0];
   if (!listEl) return;
   const itemCount = $listWrapper.find('.rlh-item-container').length;
   if (itemCount < 2) return;
+
+  $listWrapper.removeAttr('data-drag-disabled');
+  $listWrapper.find('.rlh-drag-disabled-tip').remove();
 
   parentWin.Sortable.create(listEl, {
     animation: 150,

@@ -10,6 +10,9 @@ import {
   get$,
   getParentDoc,
   debounce,
+  WORLD_BOOK_STATUS_LIST,
+  DEFAULT_WORLD_BOOK_STATUS,
+  resolveWorldbookStatus,
 } from '../../core.js';
 import {
   TavernAPI,
@@ -27,6 +30,7 @@ import {
   prependEntry,
   buildLoreEntryViewerHTML,
   buildRegexViewerHTML,
+  updateEntryStatusDom,
 } from '../render/index.js';
 
 // --- 条目事件处理 ---
@@ -140,6 +144,23 @@ export function createItemHandlers(deps = {}) {
         value = $target.val();
       }
       // 特殊处理需要类型转换的字段
+      if (field === 'statusId') {
+        const statusMeta = resolveWorldbookStatus(value) ?? DEFAULT_WORLD_BOOK_STATUS;
+        entry.statusId = statusMeta.id;
+        if (!entry.strategy || typeof entry.strategy !== 'object') {
+          entry.strategy = {};
+        }
+        entry.strategy.type = statusMeta.strategyType;
+        entry.type = statusMeta.strategyType;
+        queueLorebookEntryUpdate(bookName, entry.uid ?? id, {
+          statusId: statusMeta.id,
+          strategy: { ...(entry.strategy ?? {}), type: statusMeta.strategyType },
+          type: statusMeta.strategyType,
+        });
+        updateEntryStatusDom(bookName, entry.uid ?? id, statusMeta.id);
+        debouncedSave();
+        return;
+      }
       if (field === 'keys') {
         entry.keys = value.split(',').map(k => k.trim()).filter(Boolean);
       } else if (['depth', 'order', 'probability'].includes(field)) {
@@ -174,8 +195,25 @@ export function createItemHandlers(deps = {}) {
       .join('');
     const keywordsText = Array.isArray(entry.keys) ? entry.keys.join(', ') : '';
     const contentText = entry.content || '';
+    const currentStatusId = entry.statusId ?? DEFAULT_WORLD_BOOK_STATUS.id;
+    entry.statusId = currentStatusId;
+    const statusMeta = resolveWorldbookStatus(currentStatusId) ?? DEFAULT_WORLD_BOOK_STATUS;
+    if (!entry.strategy || typeof entry.strategy !== 'object') {
+      entry.strategy = {};
+    }
+    entry.strategy.type = statusMeta.strategyType;
+    entry.type = statusMeta.strategyType;
+    const statusOptions = WORLD_BOOK_STATUS_LIST.map(status => {
+      const selected = currentStatusId === status.id ? 'selected' : '';
+      return `<option value="${status.id}" ${selected}>${status.label}</option>`;
+    }).join('');
     return `
       <div class="rlh-editor-wrapper" data-mode="edit">
+        <div class="rlh-editor-group"><h5>状态</h5>
+          <div class="rlh-editor-grid">
+            <div class="rlh-grid-item"><label>激活状态</label><select class="rlh-edit-status rlh-select-nudge" data-field="statusId">${statusOptions}</select></div>
+          </div>
+        </div>
         <div class="rlh-editor-field">
           <label>关键词 (逗号分隔)</label>
           <input type="text" class="rlh-edit-keys" data-field="keys" value="${escapeHtml(keywordsText)}">
