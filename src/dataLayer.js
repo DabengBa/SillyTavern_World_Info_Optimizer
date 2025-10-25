@@ -14,6 +14,11 @@ import {
   getParentDoc,
   getParentWin,
   getTavernHelper,
+  DEFAULT_WORLD_BOOK_STATUS,
+  DEFAULT_STATUS_ID,
+  resolveWorldbookStatus,
+  normalizeWorldbookStatusId,
+  resolveLorebookBindingStats,
 } from './core.js';
 import { renderContent } from './ui/render/index.js';
 import { renderSaveStatus } from './ui/render/shared.js';
@@ -348,6 +353,10 @@ export const normalizeWorldbookEntry = entry => {
     clone.strategy = {};
   }
   const strategy = clone.strategy;
+  const statusDef = resolveWorldbookStatus(inferStatusIdFromEntry(clone)) ?? DEFAULT_WORLD_BOOK_STATUS;
+  strategy.type = statusDef.strategyType;
+  clone.type = statusDef.strategyType;
+  clone.statusId = statusDef.id;
 
   const keys = sanitizeKeyArray(strategy.keys ?? clone.keys ?? clone.key ?? clone.keywords);
   strategy.keys = [...keys];
@@ -408,6 +417,21 @@ export const normalizeWorldbookEntry = entry => {
 const convertUiEntryToRaw = (uiEntry, baseEntry = {}) => {
   const raw = cloneEntry(baseEntry);
   const uiClone = cloneEntry(uiEntry);
+
+  const resolvedStatus =
+    resolveWorldbookStatus(uiClone.statusId ?? uiClone.strategy?.type ?? uiClone.type) ?? DEFAULT_WORLD_BOOK_STATUS;
+  if (!raw.strategy || typeof raw.strategy !== 'object') {
+    raw.strategy = {};
+  }
+  raw.strategy.type = resolvedStatus.strategyType;
+  raw.type = resolvedStatus.strategyType;
+  raw.statusId = resolvedStatus.id;
+  uiClone.statusId = resolvedStatus.id;
+  if (!uiClone.strategy || typeof uiClone.strategy !== 'object') {
+    uiClone.strategy = {};
+  }
+  uiClone.strategy.type = resolvedStatus.strategyType;
+  uiClone.type = resolvedStatus.strategyType;
 
   const numericUid = parseOptionalNumber(uiClone.uid);
   if (numericUid !== null) raw.uid = numericUid;
@@ -518,6 +542,66 @@ const resolveNumericUid = value => {
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : null;
 };
+
+const inferStatusIdFromEntry = entry => {
+  if (!entry || typeof entry !== 'object') return DEFAULT_STATUS_ID;
+  const rawType = entry?.strategy?.type ?? entry?.type;
+  const normalized = normalizeWorldbookStatusId(rawType);
+  return normalized ?? DEFAULT_STATUS_ID;
+};
+
+const toTargetMeta = target => {
+  if (target && typeof target === 'object') {
+    const candidateUid =
+      resolveNumericUid(target.uid ?? target.id ?? target.entryUid ?? target.entry_id ?? null);
+    return {
+      uid: candidateUid,
+      tempUid: target.tempUid ?? target.temp_uid ?? null,
+      name: target.name ?? '',
+    };
+  }
+  return { uid: resolveNumericUid(target), tempUid: null, name: '' };
+};
+
+const makeEntryMeta = (entry, fallback = {}) => {
+  const targetMeta = toTargetMeta(entry);
+  const fallbackMeta = toTargetMeta(fallback);
+  return {
+    uid: targetMeta.uid ?? fallbackMeta.uid ?? null,
+    tempUid: entry?.tempUid ?? entry?.temp_uid ?? fallbackMeta.tempUid ?? null,
+    name: entry?.name ?? fallbackMeta.name ?? '',
+    previousStatus: inferStatusIdFromEntry(entry ?? {}),
+  };
+};
+
+const makeTargetMeta = target => {
+  const meta = toTargetMeta(target);
+  return {
+    uid: meta.uid,
+    tempUid: meta.tempUid,
+    name: meta.name,
+    previousStatus: null,
+  };
+};
+
+const makeStatusRecord = (meta, overrides = {}) => ({
+  uid: meta?.uid ?? null,
+  tempUid: meta?.tempUid ?? null,
+  name: meta?.name ?? '',
+  previousStatus: meta?.previousStatus ?? null,
+  newStatus: overrides.newStatus ?? null,
+  alreadyApplied: Boolean(overrides.alreadyApplied),
+  reason: overrides.reason ?? null,
+  error: overrides.error ?? null,
+});
+
+const STATUS_CHANGE_REASON = Object.freeze({
+  UNSAVED_ENTRY: 'UNSAVED_ENTRY',
+  DUPLICATE_SELECTION: 'DUPLICATE_SELECTION',
+  ENTRY_NOT_FOUND: 'ENTRY_NOT_FOUND',
+  API_ERROR: 'API_ERROR',
+  STATUS_NOT_APPLIED: 'STATUS_NOT_APPLIED',
+});
 
 const sanitizeKeysForUpdate = keys => sanitizeKeyArray(keys);
 
@@ -645,6 +729,204 @@ export const updateWorldbookEntries = errorCatched(async (bookName, entryUpdates
   await TavernAPI.saveSettings();
   return updatedEntries;
 });
+
+const buildStatusSummary = (statusDef, successRecords, failedRecords, ignoredRecords, requestedCount) => {
+  const successCount = successRecords.length;
+  const failedCount = failedRecords.length;
+  const ignoredCount = ignoredRecords.length;
+  const alreadyAppliedCount = successRecords.filter(record => record.alreadyApplied).length;
+  const appliedCount = successCount - alreadyAppliedCount;
+  const ignoredUnsavedCount = ignoredRecords.filter(
+    record => record.reason === STATUS_CHANGE_REASON.UNSAVED_ENTRY,
+  ).length;
+
+  let status = 'skipped';
+  if (successCount > 0 && failedCount === 0) status = 'success';
+  else if (successCount > 0 && failedCount > 0) status = 'partial';
+  else if (failedCount > 0) status = 'failed';
+
+  return {
+    status,
+    successCount,
+    failedCount,
+    ignoredCount,
+    alreadyAppliedCount,
+    appliedCount,
+    ignoredUnsavedCount,
+    requestedCount,
+    targetStatusId: statusDef.id,
+    targetStatusLabel: statusDef.label,
+  };
+};
+
+export const updateWorldbookEntriesStatus = async (bookName, targets, targetStatusId, options = {}) => {
+  const normalizedTargets = Array.isArray(targets)
+    ? targets.filter(item => item !== undefined && item !== null)
+    : targets !== undefined && targets !== null
+      ? [targets]
+      : [];
+  const requestedCount = normalizedTargets.length;
+
+  const statusDef = resolveWorldbookStatus(targetStatusId);
+  if (!statusDef) {
+    return {
+      ok: false,
+      targetStatusId: normalizeWorldbookStatusId(targetStatusId),
+      targetStatusLabel: '',
+      targetStrategyType: null,
+      success: [],
+      failed: [],
+      ignored: [],
+      summary: {
+        status: 'failed',
+        successCount: 0,
+        failedCount: 0,
+        ignoredCount: 0,
+        alreadyAppliedCount: 0,
+        appliedCount: 0,
+        ignoredUnsavedCount: 0,
+        requestedCount,
+        targetStatusId: normalizeWorldbookStatusId(targetStatusId),
+        targetStatusLabel: '',
+      },
+      errorCode: 'INVALID_STATUS',
+    };
+  }
+
+  if (!bookName || typeof bookName !== 'string') {
+    const fallbackStatus = DEFAULT_WORLD_BOOK_STATUS;
+    return {
+      ok: false,
+      targetStatusId: fallbackStatus.id,
+      targetStatusLabel: fallbackStatus.label,
+      targetStrategyType: fallbackStatus.strategyType,
+      success: [],
+      failed: [],
+      ignored: [],
+      summary: buildStatusSummary(fallbackStatus, [], [], [], requestedCount),
+      errorCode: 'INVALID_BOOK_NAME',
+    };
+  }
+
+  const entries = safeGetLorebookEntries(bookName);
+  const entryMap = new Map(entries.map(entry => [resolveNumericUid(entry?.uid), entry]));
+  const processedUids = new Set();
+
+  const successRecords = [];
+  const failedRecords = [];
+  const ignoredRecords = [];
+
+  const pendingUpdates = [];
+  const pendingMeta = new Map();
+
+  normalizedTargets.forEach(target => {
+    const targetMeta = makeTargetMeta(target);
+    if (targetMeta.uid === null) {
+      ignoredRecords.push(
+        makeStatusRecord(targetMeta, { reason: STATUS_CHANGE_REASON.UNSAVED_ENTRY }),
+      );
+      return;
+    }
+
+    if (processedUids.has(targetMeta.uid)) {
+      const duplicateEntry = entryMap.get(targetMeta.uid);
+      const duplicateMeta = duplicateEntry ? makeEntryMeta(duplicateEntry, targetMeta) : targetMeta;
+      ignoredRecords.push(
+        makeStatusRecord(duplicateMeta, { reason: STATUS_CHANGE_REASON.DUPLICATE_SELECTION }),
+      );
+      return;
+    }
+    processedUids.add(targetMeta.uid);
+
+    const currentEntry = entryMap.get(targetMeta.uid);
+    if (!currentEntry) {
+      failedRecords.push(
+        makeStatusRecord(targetMeta, { reason: STATUS_CHANGE_REASON.ENTRY_NOT_FOUND }),
+      );
+      return;
+    }
+
+    const entryMeta = makeEntryMeta(currentEntry, targetMeta);
+
+    if (entryMeta.previousStatus === statusDef.id) {
+      successRecords.push(
+        makeStatusRecord(entryMeta, {
+          newStatus: statusDef.id,
+          alreadyApplied: true,
+        }),
+      );
+      return;
+    }
+
+    const nextStrategy = cloneEntry(currentEntry.strategy ?? {});
+    nextStrategy.type = statusDef.strategyType;
+
+    pendingUpdates.push({
+      uid: entryMeta.uid,
+      statusId: statusDef.id,
+      strategy: nextStrategy,
+      type: statusDef.strategyType,
+    });
+    pendingMeta.set(entryMeta.uid, entryMeta);
+  });
+
+  let updateResult;
+  if (pendingUpdates.length > 0) {
+    updateResult = await updateWorldbookEntries(bookName, pendingUpdates);
+  }
+
+  if (pendingMeta.size > 0) {
+    const latestEntries = safeGetLorebookEntries(bookName);
+    const latestMap = new Map(
+      latestEntries.map(entry => [resolveNumericUid(entry?.uid), entry]),
+    );
+    const apiFailed = pendingUpdates.length > 0 && !Array.isArray(updateResult);
+    pendingMeta.forEach(entryMeta => {
+      const latestEntry = latestMap.get(entryMeta.uid);
+      const latestStatus = inferStatusIdFromEntry(latestEntry);
+      if (!latestEntry || latestStatus !== statusDef.id) {
+        failedRecords.push(
+          makeStatusRecord(entryMeta, {
+            reason: apiFailed
+              ? STATUS_CHANGE_REASON.API_ERROR
+              : STATUS_CHANGE_REASON.STATUS_NOT_APPLIED,
+          }),
+        );
+        return;
+      }
+
+      successRecords.push(
+        makeStatusRecord(entryMeta, {
+          newStatus: statusDef.id,
+        }),
+      );
+    });
+  }
+
+  const summary = buildStatusSummary(
+    statusDef,
+    successRecords,
+    failedRecords,
+    ignoredRecords,
+    requestedCount,
+  );
+
+  return {
+    ok: summary.status === 'success',
+    targetStatusId: statusDef.id,
+    targetStatusLabel: statusDef.label,
+    targetStrategyType: statusDef.strategyType,
+    targetToastLabel: statusDef.toastLabel ?? statusDef.label,
+    success: successRecords,
+    failed: failedRecords,
+    ignored: ignoredRecords,
+    summary,
+    options,
+  };
+};
+
+export const updateWorldbookEntryStatus = async (bookName, target, targetStatusId, options = {}) =>
+  updateWorldbookEntriesStatus(bookName, target === undefined ? [] : [target], targetStatusId, options);
 
 
 const ensurePendingLorebookUpdateMap = bookName => {
@@ -1122,6 +1404,29 @@ export const prefetchGlobalBookSummaries = errorCatched(async () => {
   }
 });
 
+export const resolveUnboundGlobalLorebooks = () => {
+  const books = Array.isArray(appState.allLorebooks) ? appState.allLorebooks : [];
+  const statsByName = new Map();
+  const unboundNames = new Set();
+  let totalUsableBooks = 0;
+
+  books.forEach(rawBook => {
+    const stats = resolveLorebookBindingStats(rawBook);
+    if (!stats.name) return;
+    totalUsableBooks += 1;
+    statsByName.set(stats.name, stats);
+    if (stats.bindingCount === 0) {
+      unboundNames.add(stats.name);
+    }
+  });
+
+  return {
+    totalBooks: totalUsableBooks,
+    unboundNames,
+    statsByName,
+  };
+};
+
 export const refreshCharacterData = errorCatched(async () => {
   // 检查是否有活跃的聊天
   const parentWin = getParentWin();
@@ -1225,6 +1530,7 @@ export const createInMemoryEntry = bookName => {
     keys: [],
     key: [],
     keysecondary: [],
+    statusId: DEFAULT_STATUS_ID,
     enabled: true,
     disable: false,
     is_temp: true, // 标记为临时条目
@@ -1242,6 +1548,13 @@ export const createInMemoryEntry = bookName => {
     match_whole_words: false,
     prevent_recursion: false,
     exclude_recursion: false,
+    type: DEFAULT_WORLD_BOOK_STATUS?.strategyType ?? 'constant',
+    strategy: {
+      type: DEFAULT_WORLD_BOOK_STATUS?.strategyType ?? 'constant',
+      keys: [],
+      keys_secondary: { logic: 'and_any', keys: [] },
+      scan_depth: 'same_as_global',
+    },
   };
 
   const entries = safeGetLorebookEntries(bookName);

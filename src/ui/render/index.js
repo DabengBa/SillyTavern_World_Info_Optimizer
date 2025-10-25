@@ -100,11 +100,21 @@ export const getViewContext = () => {
   }
 
   if (tab === 'char-lore') {
+    let activeCharacterBook = appState.activeCharacterBook;
+    if (!activeCharacterBook) {
+      const characterBooks = Array.isArray(appState.lorebooks?.character) ? appState.lorebooks.character : [];
+      const fallbackBook = characterBooks.find(name => typeof name === 'string' && name.trim().length);
+      if (fallbackBook) {
+        activeCharacterBook = fallbackBook;
+        appState.activeCharacterBook = fallbackBook;
+      }
+    }
+
     return {
       ...base,
       id: 'char-lore',
       instanceKey: 'char-lore',
-      activeBookName: appState.activeCharacterBook,
+      activeBookName: activeCharacterBook,
       scopeLabel: '搜索范围：当前世界书',
       replaceScopeLabel: '在当前世界书中替换',
       visibleFilters: ['entryName', 'keywords', 'content'],

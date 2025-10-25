@@ -672,22 +672,47 @@ export function createLorebookHandlers(deps = {}) {
       return;
     }
 
+    const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    let targetEntries = entries;
+    if (isEntryMultiSelect) {
+      const selectionPrefix = `lore:${resolvedBookName}:`;
+      const selectedUidSet = new Set();
+      appState.selectedItems.forEach(key => {
+        if (typeof key !== 'string' || !key.startsWith(selectionPrefix)) return;
+        const rawId = key.slice(selectionPrefix.length);
+        const numericId = Number(rawId);
+        if (Number.isFinite(numericId)) selectedUidSet.add(numericId);
+      });
+      if (selectedUidSet.size === 0) {
+        await showModal({ type: 'alert', title: '提示', text: '已开启多选，请先勾选要统一位置的条目。' });
+        return;
+      }
+      targetEntries = entries.filter(entry => selectedUidSet.has(Number(entry?.uid)));
+      if (!targetEntries.length) {
+        await showModal({ type: 'alert', title: '提示', text: '未能匹配到已选择的条目，请重新选择后再试。' });
+        return;
+      }
+    }
+
     const optionLabel = LOREBOOK_OPTIONS.position?.[targetPosition] ?? targetPosition;
 
-    const updates = entries
+    const updates = targetEntries
       .filter(entry => (entry?.position ?? '').toString() !== targetPosition)
       .map(entry => ({ uid: entry.uid, position: targetPosition }));
 
     if (!updates.length) {
-      await showModal({ type: 'alert', title: '提示', text: `所有条目的位置已经是「${optionLabel}」。` });
+      const scopeLabel = isEntryMultiSelect ? '所选条目' : '所有条目';
+      await showModal({ type: 'alert', title: '提示', text: `${scopeLabel}的位置已经是「${optionLabel}」。` });
       return;
     }
 
     try {
+      const targetCount = targetEntries.length;
+      const scopeLabel = isEntryMultiSelect ? '选中的条目' : `"${resolvedBookName}" 中的条目`;
       await showModal({
         type: 'confirm',
         title: '确认操作',
-        text: `确定要将 "${resolvedBookName}" 中的 ${entries.length} 个条目全部设置为「${optionLabel}」吗？`,
+        text: `确定要将 ${scopeLabel}（共 ${targetCount} 个）设置为「${optionLabel}」吗？`,
       });
     } catch {
       return;

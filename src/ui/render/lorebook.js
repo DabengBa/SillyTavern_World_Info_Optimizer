@@ -55,15 +55,41 @@ const sortLoreEntries = (entries, sortMode) => {
   return list.sort((a, b) => (a.name || '无标题条目').localeCompare(b.name || '无标题条目', 'zh'));
 };
 
-export const getGlobalLorebookMatches = (searchTerm, caseSensitive = false) => {
+export const getGlobalLorebookMatches = (searchTerm, caseSensitive = false, options = {}) => {
   const matches = [];
   const booksMatchedByNameOnly = [];
   const stats = { bookName: 0, entryName: 0, keywords: 0, content: 0 };
-  if (!searchTerm) return { matches, stats, booksMatchedByNameOnly };
 
-  const books = appState.allLorebooks;
+  const normalizedSearchTerm = typeof searchTerm === 'string' ? searchTerm : '';
+  if (!normalizedSearchTerm) {
+    return { matches, stats, booksMatchedByNameOnly };
+  }
+
+  const { bookNames } = options;
+  const targetNames = Array.isArray(bookNames)
+    ? [...new Set(
+        bookNames
+          .map(name => (typeof name === 'string' ? name.trim() : ''))
+          .filter(name => Boolean(name)),
+      )]
+    : [];
+
+  const allBooks = Array.isArray(appState.allLorebooks) ? appState.allLorebooks : [];
+  const books = targetNames.length
+    ? allBooks.filter(book => targetNames.includes(book.name))
+    : allBooks.slice();
+
+  if (targetNames.length) {
+    const knownNames = new Set(books.map(book => book.name));
+    targetNames.forEach(name => {
+      if (!knownNames.has(name)) {
+        books.push({ name });
+      }
+    });
+  }
+
   const flags = caseSensitive ? '' : 'i';
-  const searchRegex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\/\\]/g, '\\$&'), flags);
+  const searchRegex = new RegExp(normalizedSearchTerm.replace(/[.*+?^${}()|[\/\\]/g, '\\$&'), flags);
 
   const matchedBooksForName = new Set();
   const matchedEntriesForName = new Set();
@@ -72,12 +98,15 @@ export const getGlobalLorebookMatches = (searchTerm, caseSensitive = false) => {
   const addedEntries = new Set();
 
   for (const book of books) {
-    const entries = safeGetLorebookEntries(book.name);
-    const isBookNameMatch = searchRegex.test(book.name);
+    const name = book?.name ?? '';
+    if (!name) continue;
+
+    const entries = safeGetLorebookEntries(name);
+    const isBookNameMatch = searchRegex.test(name);
     let bookHasEntryMatches = false;
 
     if (isBookNameMatch) {
-      matchedBooksForName.add(book.name);
+      matchedBooksForName.add(name);
     }
 
     for (const entry of entries) {
@@ -113,14 +142,14 @@ export const getGlobalLorebookMatches = (searchTerm, caseSensitive = false) => {
       if (entryHasMatch) {
         bookHasEntryMatches = true;
         if (!addedEntries.has(entry.uid)) {
-          matches.push({ bookName: book.name, entry, matchedFields: currentMatch });
+          matches.push({ bookName: name, entry, matchedFields: currentMatch });
           addedEntries.add(entry.uid);
         }
       }
     }
 
     if (isBookNameMatch && !bookHasEntryMatches) {
-      booksMatchedByNameOnly.push(book.name);
+      booksMatchedByNameOnly.push(name);
     }
   }
 
@@ -355,64 +384,6 @@ const renderGlobalLoreDetailView = (context, searchTerm, $container) => {
     </div>
   `;
   $content.html(entriesHtml);
-};
-
-export const getCharacterLorebookMatches = searchTerm => {
-  let matches = [];
-  const linkedBooks = appState.lorebooks.character;
-  const parentWin = getParentWin();
-  const context = parentWin.SillyTavern?.getContext?.() || {};
-  const hasActiveCharacter = context.characterId !== undefined && context.characterId !== null;
-
-  if (!hasActiveCharacter || linkedBooks.length === 0) {
-    return matches;
-  }
-
-  let activeBookName = appState.activeCharacterBook;
-  if (!activeBookName || !linkedBooks.includes(activeBookName)) {
-    activeBookName = linkedBooks[0];
-    appState.activeCharacterBook = activeBookName;
-  }
-
-  if (!activeBookName) {
-    return matches;
-  }
-
-  const targetBooks = [activeBookName];
-  const normalizedSearch = typeof searchTerm === 'string' ? searchTerm.toLowerCase() : '';
-  const hasSearch = Boolean(normalizedSearch);
-
-  targetBooks.forEach(bookName => {
-    const entries = [...safeGetLorebookEntries(bookName)].sort(
-      (a, b) => ((a.display_index ?? Number.MAX_SAFE_INTEGER) - (b.display_index ?? Number.MAX_SAFE_INTEGER)),
-    );
-
-    if (!hasSearch) {
-      entries.forEach(entry => {
-        matches.push({ bookName, entry });
-      });
-    } else {
-      entries.forEach(entry => {
-        const nameMatches = (entry.name || '').toLowerCase().includes(normalizedSearch);
-        const keywordsMatches = Array.isArray(entry.keys)
-          ? entry.keys.join(' ').toLowerCase().includes(normalizedSearch)
-          : false;
-        const contentMatches = entry.content && entry.content.toLowerCase().includes(normalizedSearch);
-        const bookMatches =
-          appState.searchFilters.bookName && bookName.toLowerCase().includes(normalizedSearch);
-        const entryMatches =
-          (appState.searchFilters.entryName && nameMatches) ||
-          (appState.searchFilters.keywords && keywordsMatches) ||
-          (appState.searchFilters.content && contentMatches);
-
-        if (bookMatches || entryMatches) {
-          matches.push({ bookName, entry });
-        }
-      });
-    }
-  });
-
-  return matches;
 };
 
 export const renderCharacterLorebookView = (context, searchTerm, $container) => {

@@ -36,6 +36,7 @@ import {
   SORT_MENU_BUTTON_ID,
 
   POSITION_MENU_BUTTON_ID,
+  UNIFIED_STATUS_BUTTON_ID,
 
   CREATE_LOREBOOK_BTN_ID,
 
@@ -63,6 +64,71 @@ import { renderContent } from './render/index.js';
 
 import { builtCSS } from '../styles/generated.js';
 
+const LOCAL_SORTABLE_URL = (() => {
+  try {
+    // 基于当前模块路径推导 vendor 目录下的 Sortable 资源
+    return new URL('../vendor/Sortable.min.js', import.meta.url).href;
+  } catch (error) {
+    console.error('[RegexLoreHub] 计算 SortableJS 本地路径失败：', error);
+    return '';
+  }
+})();
+
+const normalizeUrl = value => {
+  if (!value || typeof value !== 'string') return '';
+  return value.trim().replace(/\\/g, '/').replace(/\/+$/, '');
+};
+
+const joinUrlSegments = (base, segment) => {
+  const normalizedBase = normalizeUrl(base);
+  if (!normalizedBase) return '';
+  const cleanedSegment = segment.replace(/^\/+/, '');
+  return `${normalizedBase}/${cleanedSegment}`;
+};
+
+const collectSortableCandidateUrls = (parentDoc, parentWin) => {
+  const candidates = [];
+  const addCandidate = url => {
+    if (!url || typeof url !== 'string') return;
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    if (!candidates.includes(trimmed)) candidates.push(trimmed);
+  };
+
+  addCandidate(joinUrlSegments(appState.paths?.vendor, 'Sortable.min.js'));
+  addCandidate(joinUrlSegments(appState.paths?.rlhRoot, 'vendor/Sortable.min.js'));
+
+  try {
+    addCandidate(new URL('../vendor/Sortable.min.js', import.meta.url).href);
+  } catch (error) {
+    console.warn('[RegexLoreHub] 基于模块路径推导 Sortable 资源失败：', error);
+  }
+
+  try {
+    if (parentDoc) {
+      const scriptEls = parentDoc.querySelectorAll('script[src]');
+      scriptEls.forEach(scriptEl => {
+        const src = scriptEl.getAttribute('src');
+        if (!src || !/regex[-_]lore[-_]hub/i.test(src)) return;
+        try {
+          const absolute = new URL(src, parentWin?.location?.href || window.location.href);
+          const base = normalizeUrl(absolute.href.replace(/\/[^/]*$/, ''));
+          addCandidate(joinUrlSegments(base, 'vendor/Sortable.min.js'));
+          addCandidate(joinUrlSegments(base, 'src/vendor/Sortable.min.js'));
+        } catch (innerError) {
+          console.warn('[RegexLoreHub] 宿主脚本路径推导失败：', innerError);
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 遍历宿主脚本节点失败：', error);
+  }
+
+  addCandidate(LOCAL_SORTABLE_URL);
+  addCandidate('https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js');
+
+  return candidates.filter(Boolean);
+};
 
 
 
@@ -109,37 +175,119 @@ export function initializeUI(createHandlers) {
 
 
   function loadSortableJS(callback) {
+    appState.isDragSortDisabled = false;
 
     if (parentWin.Sortable) {
-
-      callback();
-
+      if (typeof callback === 'function') {
+        try {
+          callback();
+        } catch (error) {
+          console.error('[RegexLoreHub] 初始化回调执行失败：', error);
+        }
+      }
       return;
-
     }
 
-    const script = parentWin.document.createElement('script');
-
-    script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js';
-
-    script.onload = () => {
-
-      console.log('[RegexLoreHub] SortableJS loaded successfully.');
-
-      callback();
-
+    let hasFinished = false;
+    const safeInvokeCallback = () => {
+      if (hasFinished) return;
+      hasFinished = true;
+      if (typeof callback === 'function') {
+        try {
+          callback();
+        } catch (error) {
+          console.error('[RegexLoreHub] 初始化回调执行失败：', error);
+        }
+      }
     };
 
-    script.onerror = () => {
+    const candidateUrls = collectSortableCandidateUrls(parentDoc, parentWin);
 
-      console.error('[RegexLoreHub] Failed to load SortableJS.');
+    const handleTotalFailure = lastError => {
+      if (!parentDoc) {
+        appState.isDragSortDisabled = true;
+        console.error('[RegexLoreHub] 无法加载 SortableJS：宿主文档不可访问。', lastError);
+        safeInvokeCallback();
+        return;
+      }
 
-      showModal({ type: 'alert', title: '错误', text: '无法加载拖拽排序库，请检查网络连接或浏览器控制台。' });
+      const attemptedUrls = candidateUrls.length ? `尝试路径：${candidateUrls.join(', ')}` : '未找到可用候选路径。';
+      const inlineFallback = async () => {
+        if (typeof (parentWin.fetch || window.fetch) !== 'function') throw lastError || new Error('fetch not available');
+        const fetchImpl = parentWin.fetch ? parentWin.fetch.bind(parentWin) : window.fetch.bind(window);
+        const inlineUrl =
+          (() => {
+            try {
+              return new URL('../vendor/Sortable.min.js', import.meta.url).href;
+            } catch (error) {
+              console.warn('[RegexLoreHub] 内联回退路径解析失败：', error);
+              return '';
+            }
+          })() || candidateUrls[0] || '';
 
+        if (!inlineUrl) throw lastError || new Error('missing inline url');
+
+        const response = await fetchImpl(inlineUrl, { cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+        const scriptText = await response.text();
+        const inlineScript = parentDoc.createElement('script');
+        inlineScript.textContent = scriptText;
+        parentDoc.head.appendChild(inlineScript);
+        console.warn('[RegexLoreHub] SortableJS 已通过内联模式加载。');
+        appState.isDragSortDisabled = false;
+        safeInvokeCallback();
+      };
+
+      inlineFallback()
+        .catch(error => {
+          appState.isDragSortDisabled = true;
+          console.error('[RegexLoreHub] Failed to load SortableJS.', error ?? lastError);
+          showModal({
+            type: 'alert',
+            title: '错误',
+            text: `无法加载拖拽排序库，请检查资源路径配置。${attemptedUrls}`,
+          }).catch(() => {});
+          safeInvokeCallback();
+        })
+        .finally(() => {});
     };
 
-    parentWin.document.head.appendChild(script);
+    if (!candidateUrls.length) {
+      handleTotalFailure(new Error('Sortable candidate URLs not found.'));
+      return;
+    }
 
+    const attemptLoad = index => {
+      if (index >= candidateUrls.length) {
+        handleTotalFailure(new Error('All Sortable candidates failed.'));
+        return;
+      }
+
+      const url = candidateUrls[index];
+      const scriptEl = parentWin.document.createElement('script');
+      scriptEl.src = url;
+      scriptEl.dataset.rlhSortableCandidate = String(index);
+
+      scriptEl.onload = () => {
+        appState.isDragSortDisabled = false;
+        console.log('[RegexLoreHub] SortableJS loaded successfully.', url);
+        appState.paths = appState.paths || {};
+        appState.paths.vendor = normalizeUrl(url.replace(/\/Sortable\.min\.js(?:\?.*)?$/, ''));
+        appState.paths.rlhRoot =
+          appState.paths.vendor?.replace(/\/vendor$/, '') || appState.paths.rlhRoot || '';
+        safeInvokeCallback();
+      };
+
+      scriptEl.onerror = event => {
+        scriptEl.remove();
+        console.warn('[RegexLoreHub] SortableJS 加载失败，尝试下一个候选。', url, event?.error);
+        attemptLoad(index + 1);
+      };
+
+      parentWin.document.head.appendChild(scriptEl);
+    };
+
+    attemptLoad(0);
   }
 
 
@@ -183,7 +331,7 @@ export function initializeUI(createHandlers) {
 
               <h4>${BUTTON_TOOLTIP}</h4>
 
-              <p class="rlh-shell-meta"><span class="rlh-shell-version">v3.0</span><span class="rlh-shell-dot">·</span><span class="rlh-shell-updated">更新于 2025 年 9 月 30 日</span></p>
+              <p class="rlh-shell-meta"><span class="rlh-shell-version">v3.2</span><span class="rlh-shell-dot">·</span><span class="rlh-shell-updated">更新于 2025 年 10 月 21 日</span></p>
 
             </div>
 
@@ -355,6 +503,10 @@ export function initializeUI(createHandlers) {
 
       .on('click.rlh', '.rlh-position-option', handlers.handlePositionOptionSelect)
 
+      .on('click.rlh', `#${UNIFIED_STATUS_BUTTON_ID}`, handlers.handleUnifiedStatusMenuToggle)
+
+      .on('click.rlh', '.rlh-unified-status-option', handlers.handleUnifiedStatusOptionSelect)
+
       .on('change.rlh', '.rlh-multi-select-checkbox', handlers.handleSelectionCheckboxChange)
 
       .on('click.rlh', `#${REFRESH_BTN_ID}`, handlers.handleRefresh)
@@ -366,6 +518,8 @@ export function initializeUI(createHandlers) {
       .on('click.rlh', '#rlh-select-none-btn', handlers.handleSelectNone)
 
       .on('click.rlh', '#rlh-select-invert-btn', handlers.handleSelectInvert)
+
+      .on('click.rlh', '.rlh-select-unbound', handlers.handleSelectUnboundBooks)
 
       .on('click.rlh', '#rlh-batch-enable-btn', handlers.handleBatchEnable)
 
