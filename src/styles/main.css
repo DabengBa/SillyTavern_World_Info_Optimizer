@@ -50,6 +50,27 @@
     --rlh-status-vectorized: #c084fc;
   }
 
+  #regex-lore-hub-panel.rlh-theme-gruvbox {
+    --rlh-bg-color: #f9f5d7;
+    --rlh-surface-color: color-mix(in srgb, #fbf1c7 92%, transparent);
+    --rlh-text-color: #3c3836;
+    --rlh-em-color: #7c6f64;
+    --rlh-border-color: color-mix(in srgb, #d65d0e 24%, #d5c4a1 76%);
+    --rlh-hover-bg: color-mix(in srgb, var(--rlh-accent-color) 16%, transparent);
+    --rlh-selected-bg: color-mix(in srgb, var(--rlh-accent-color) 26%, transparent);
+    --rlh-shadow-color: rgba(60, 56, 54, 0.2);
+    --rlh-header-bg: color-mix(in srgb, #ebdbb2 85%, transparent);
+    --rlh-input-bg: color-mix(in srgb, #fbf1c7 90%, transparent);
+    --rlh-accent-color: #d65d0e;
+    --rlh-green: #98971a;
+    --rlh-red: #cc241d;
+    --rlh-green-bg: color-mix(in srgb, var(--rlh-green) 18%, transparent);
+    --rlh-red-bg: color-mix(in srgb, var(--rlh-red) 18%, transparent);
+    --rlh-status-constant: #98971a;
+    --rlh-status-selective: #458588;
+    --rlh-status-vectorized: #b16286;
+  }
+
   @keyframes rlhFadeInUp {
     from {
       opacity: 0;
@@ -316,6 +337,74 @@
     background-color: color-mix(in srgb, var(--rlh-accent-color) 18%, transparent);
   }
 
+  .rlh-theme-toggle .rlh-theme-toggle-label {
+    white-space: nowrap;
+  }
+
+  .rlh-theme-toggle-caret {
+    margin-left: 0.45rem;
+    font-size: 0.78rem;
+    transition: transform 0.2s ease;
+  }
+
+  .rlh-theme-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .rlh-theme-menu-list {
+    min-width: 12rem;
+    padding: 0.55rem;
+  }
+
+  .rlh-theme-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .rlh-theme-option-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.18rem;
+  }
+
+  .rlh-theme-option-meta {
+    font-size: 0.78rem;
+    color: color-mix(in srgb, var(--rlh-em-color) 85%, transparent);
+  }
+
+  .rlh-theme-option-check {
+    color: var(--rlh-accent-color);
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  .rlh-theme-option[data-active='true'] .rlh-theme-option-check {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .rlh-theme-option[data-active='true'] {
+    background-color: color-mix(in srgb, var(--rlh-selected-bg) 72%, transparent);
+    border-color: color-mix(in srgb, var(--rlh-accent-color) 45%, transparent);
+    color: color-mix(in srgb, var(--rlh-text-color) 88%, var(--rlh-accent-color) 12%);
+  }
+
+  .rlh-theme-option[data-active='true'] .rlh-theme-option-meta {
+    color: color-mix(in srgb, var(--rlh-em-color) 65%, var(--rlh-accent-color) 20%);
+  }
+
+  .rlh-theme-menu.open .rlh-theme-toggle-caret {
+    transform: rotate(180deg);
+  }
+
   .rlh-tab-nav {
     display: flex;
     flex-wrap: wrap;
@@ -543,7 +632,7 @@
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-accent-color) 45%, var(--rlh-border-color) 55%);
     background-color: color-mix(in srgb, var(--rlh-surface-color) 88%, var(--rlh-accent-color) 12%);
-    color: color-mix(in srgb, var(--rlh-text-color) 90%, var(--rlh-accent-color) 10%);
+    color: var(--rlh-text-color);
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -561,7 +650,7 @@
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-accent-color) 45%, var(--rlh-border-color) 55%);
     background-color: color-mix(in srgb, var(--rlh-surface-color) 88%, var(--rlh-accent-color) 12%);
-    color: color-mix(in srgb, var(--rlh-text-color) 90%, var(--rlh-accent-color) 10%);
+    color: var(--rlh-text-color);
     line-height: 1;
     cursor: pointer;
     transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -616,7 +705,7 @@
     background-color: color-mix(in srgb, var(--rlh-accent-color) 26%, var(--rlh-surface-color));
     border-color: color-mix(in srgb, var(--rlh-accent-color) 70%, var(--rlh-border-color) 30%);
     box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--rlh-accent-color) 45%, transparent), 0 10px 22px -16px var(--rlh-shadow-color);
-    color: color-mix(in srgb, var(--rlh-text-color) 85%, var(--rlh-accent-color) 15%);
+    color: var(--rlh-text-color);
     transform: translateY(-1px) scale(1.01);
   }
 
@@ -626,7 +715,7 @@
     opacity: 0.55;
     box-shadow: none;
     border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    color: color-mix(in srgb, var(--rlh-text-color) 75%, var(--rlh-accent-color) 5%);
+    color: color-mix(in srgb, var(--rlh-text-color) 55%, var(--rlh-surface-color) 45%);
   }
 
   .rlh-toolbar-btn:focus-visible {
@@ -639,7 +728,27 @@
     background-color: color-mix(in srgb, var(--rlh-accent-color) 32%, var(--rlh-surface-color));
     border-color: color-mix(in srgb, var(--rlh-accent-color) 75%, var(--rlh-border-color) 25%);
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rlh-accent-color) 50%, transparent);
-    color: color-mix(in srgb, var(--rlh-accent-color) 70%, var(--rlh-text-color));
+    color: var(--rlh-text-color);
+  }
+
+  /* 提升按钮文字在亮色主题下的对比度 */
+  #regex-lore-hub-panel .rlh-toolbar-btn,
+  #regex-lore-hub-panel .rlh-toolbar-btn:hover,
+  #regex-lore-hub-panel .rlh-toolbar-btn.active {
+    color: var(--rlh-text-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-toolbar-btn:disabled,
+  #regex-lore-hub-panel .rlh-toolbar-btn.disabled {
+    color: color-mix(in srgb, var(--rlh-text-color) 55%, var(--rlh-surface-color) 45%);
+  }
+
+  #regex-lore-hub-panel .rlh-toolbar-icon-btn,
+  #regex-lore-hub-panel .rlh-action-btn-icon,
+  #regex-lore-hub-panel .rlh-toggle-btn,
+  #regex-lore-hub-panel .rlh-icon-button,
+  #regex-lore-hub-panel .rlh-close-button {
+    color: var(--rlh-text-color) !important;
   }
 
   .rlh-search-field {
@@ -1700,6 +1809,11 @@
     border-color: color-mix(in srgb, var(--rlh-border-color) 60%, transparent);
   }
 
+  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-meta-chip {
+    background: color-mix(in srgb, var(--rlh-hover-bg) 60%, transparent);
+    border-color: color-mix(in srgb, var(--rlh-border-color) 55%, transparent);
+  }
+
   .rlh-item-controls {
     display: inline-flex;
     align-items: center;
@@ -1756,7 +1870,7 @@
     border-radius: 9999px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
     background: transparent;
-    color: var(--rlh-em-color);
+    color: var(--rlh-text-color);
     cursor: pointer;
     transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   }

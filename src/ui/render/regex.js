@@ -98,7 +98,6 @@ export const renderRegexView = (context, itemList, searchTerm, $container, title
   filteredItems.forEach((item, index) => {
     const $element = createItemElement(item, 'regex', '', searchTerm, {
       collapseState,
-      selectionKey: `regex:${item.id}`,
       enableDrag: canReorder,
     });
     $element.find('.rlh-item-name').prepend(`<span class="rlh-order-indicator">#${index + 1}</span> `);

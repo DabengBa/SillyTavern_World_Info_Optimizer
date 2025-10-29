@@ -1,4 +1,4 @@
-import { loadAllData } from '../dataLayer.js';
+import { loadAllData, loadThemePreference } from '../dataLayer.js';
 
 import {
 
@@ -49,6 +49,18 @@ import {
   PREFETCH_PROGRESS_BAR_ID,
   appState,
   showModal,
+  syncThemeToDom,
+  listThemes,
+  getActiveTheme,
+  getThemeLabel,
+  setActiveTheme,
+  onThemeChange,
+  THEME_MENU_WRAPPER_ID,
+  THEME_MENU_ID,
+  THEME_TOGGLE_BTN_ID,
+  THEME_TOGGLE_LABEL_ID,
+  THEME_OPTION_CLASS,
+  escapeHtml,
 
   get$,
 
@@ -132,7 +144,7 @@ const collectSortableCandidateUrls = (parentDoc, parentWin) => {
 
 
 
-export function initializeUI(createHandlers) {
+export async function initializeUI(createHandlers) {
 
   const $ = get$();
 
@@ -140,15 +152,88 @@ export function initializeUI(createHandlers) {
 
   const parentWin = getParentWin();
 
+  try {
+    const storedThemeId = await loadThemePreference();
+    if (storedThemeId) {
+      const restoredTheme = setActiveTheme(storedThemeId, {
+        applyToDom: false,
+        silent: true,
+        reason: 'restore',
+      });
+      if (!restoredTheme) {
+        console.warn('[RegexLoreHub] 无法恢复存储的主题，ID:', storedThemeId);
+      }
+    } else {
+      setActiveTheme('dark', { applyToDom: false, silent: true, reason: 'initial-default' });
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 读取主题偏好失败：', error);
+  }
+
 
 
 
   const handlers = createHandlers();
 
+  const describeScheme = scheme => {
+    if (scheme === 'dark') return '暗色';
+    if (scheme === 'light') return '亮色';
+    return '自定义';
+  };
 
+  const renderThemeMenuOptions = () => {
+    const $menu = $(`#${THEME_MENU_ID}`, parentDoc);
+    if (!$menu.length) return;
+    const activeTheme = getActiveTheme();
+    const activeId = activeTheme?.id ?? '';
+    const themes = listThemes();
+    const itemsHtml = themes
+      .map(theme => {
+        const themeId = typeof theme?.id === 'string' ? theme.id.trim() : '';
+        const isActive = themeId && themeId === activeId;
+        const label = escapeHtml(getThemeLabel(themeId));
+        const schemeLabel = escapeHtml(describeScheme(theme?.colorScheme));
+        return `
+          <button type="button" class="rlh-sort-option ${THEME_OPTION_CLASS}" data-theme-id="${escapeHtml(
+            themeId,
+          )}" role="menuitemradio" aria-checked="${isActive ? 'true' : 'false'}" data-active="${isActive}">
+            <span class="rlh-theme-option-text">
+              <span class="rlh-theme-option-name">${label}</span>
+              <span class="rlh-theme-option-meta">${schemeLabel}</span>
+            </span>
+            <span class="rlh-theme-option-check"><i class="fa-solid fa-check" aria-hidden="true"></i></span>
+          </button>`;
+      })
+      .join('');
+    $menu.html(itemsHtml);
+  };
 
+  const updateThemeToggleUI = theme => {
+    const activeTheme = theme ?? getActiveTheme();
+    const activeId = activeTheme?.id ?? '';
+    const activeLabel = getThemeLabel(activeId);
+    const $label = $(`#${THEME_TOGGLE_LABEL_ID}`, parentDoc);
+    if ($label.length) {
+      $label.text(activeTheme ? `主题：${activeLabel}` : '主题：未设置');
+    }
+    const $wrapper = $(`#${THEME_MENU_WRAPPER_ID}`, parentDoc);
+    if ($wrapper.length) {
+      $wrapper.attr('data-active-theme', activeId);
+    }
+    const $options = $(`#${THEME_MENU_ID}`, parentDoc).find(`.${THEME_OPTION_CLASS}`);
+    $options.each((_, element) => {
+      const $option = $(element);
+      const optionId = String($option.data('themeId') ?? '').trim();
+      const isActive = optionId === activeId && Boolean(activeId);
+      $option.attr('data-active', String(isActive));
+      $option.attr('aria-checked', String(isActive));
+    });
+  };
 
-
+  onThemeChange(({ theme }) => {
+    renderThemeMenuOptions();
+    updateThemeToggleUI(theme);
+  });
   function injectCSS() {
 
     const existingStyle = parentDoc.getElementById(`${PANEL_ID}-styles`);
@@ -353,6 +438,22 @@ export function initializeUI(createHandlers) {
 
               <div class="rlh-shell-actions">
 
+                <div id="${THEME_MENU_WRAPPER_ID}" class="rlh-theme-menu rlh-sort-menu" data-open="false">
+
+                  <button type="button" id="${THEME_TOGGLE_BTN_ID}" class="rlh-theme-toggle" title="切换主题" aria-haspopup="true" aria-expanded="false" aria-controls="${THEME_MENU_ID}">
+
+                    <i class="fa-solid fa-palette" aria-hidden="true"></i>
+
+                    <span id="${THEME_TOGGLE_LABEL_ID}" class="rlh-theme-toggle-label">主题：加载中</span>
+
+                    <i class="fa-solid fa-caret-down rlh-theme-toggle-caret" aria-hidden="true"></i>
+
+                  </button>
+
+                  <div id="${THEME_MENU_ID}" class="rlh-sort-menu-list rlh-theme-menu-list" role="menu"></div>
+
+                </div>
+
                 <button type="button" id="${REFRESH_BTN_ID}" class="rlh-icon-button rlh-refresh-button" title="刷新数据">
 
                   <i class="fa-solid fa-arrows-rotate"></i>
@@ -418,9 +519,9 @@ export function initializeUI(createHandlers) {
 
 
     $('body', parentDoc).append(panelHtml);
-
-
-
+    syncThemeToDom();
+    renderThemeMenuOptions();
+    updateThemeToggleUI();
 
 
     const buttonHtml = `<div id="${BUTTON_ID}" class="list-group-item flex-container flexGap5 interactable" title="${BUTTON_TOOLTIP}"><span class="rlh-menu-icon"><i class="fa-solid fa-layer-group"></i></span><span>${BUTTON_TEXT_IN_MENU}</span></div>`;
@@ -440,12 +541,6 @@ export function initializeUI(createHandlers) {
 
 
     const $panel = $(`#${PANEL_ID}`, parentDoc);
-
-    $panel.addClass('dark');
-
-
-
-
 
     const $parentBody = $('body', parentDoc);
 
@@ -498,6 +593,10 @@ export function initializeUI(createHandlers) {
       .on('click.rlh', `#${SORT_MENU_BUTTON_ID}`, handlers.handleSortMenuToggle)
 
       .on('click.rlh', '.rlh-sort-option', handlers.handleSortOptionSelect)
+
+      .on('click.rlh', `#${THEME_TOGGLE_BTN_ID}`, handlers.handleThemeMenuToggle)
+
+      .on('click.rlh', `#${THEME_MENU_ID} .${THEME_OPTION_CLASS}`, handlers.handleThemeOptionSelect)
 
       .on('click.rlh', `#${POSITION_MENU_BUTTON_ID}`, handlers.handlePositionMenuToggle)
 

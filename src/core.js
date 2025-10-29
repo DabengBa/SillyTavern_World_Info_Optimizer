@@ -28,6 +28,11 @@ export const CHARACTER_BOOK_SWITCH_ID = 'rlh-character-book-switch';
 export const PREFETCH_INDICATOR_ID = 'rlh-prefetch-indicator';
 export const PREFETCH_PROGRESS_TEXT_ID = 'rlh-prefetch-progress-text';
 export const PREFETCH_PROGRESS_BAR_ID = 'rlh-prefetch-progress-bar';
+export const THEME_MENU_WRAPPER_ID = 'rlh-theme-menu-wrapper';
+export const THEME_MENU_ID = 'rlh-theme-menu';
+export const THEME_TOGGLE_BTN_ID = 'rlh-theme-toggle-btn';
+export const THEME_TOGGLE_LABEL_ID = 'rlh-theme-toggle-label';
+export const THEME_OPTION_CLASS = 'rlh-theme-option';
 export const DOM_ID = {
   TOOLBAR_SHELL: 'regex-lore-hub-toolbar-shell',
   TOGGLE_TOOLBAR_BTN: 'regex-lore-hub-toggle-toolbar-btn',
@@ -77,6 +82,305 @@ const detectRootFromParent = () => {
 
 const RLH_ROOT_URL = normalizeUrlBase(detectRootFromParent()) || computeDefaultModuleRoot();
 
+// 统一维护所有可用的主题变量映射，避免各处散落写死 CSS 变量名。
+const THEME_TOKEN_ENTRIES = [
+  ['focusRing', '--rlh-focus-ring'],
+  ['background', '--rlh-bg-color'],
+  ['surface', '--rlh-surface-color'],
+  ['text', '--rlh-text-color'],
+  ['textMuted', '--rlh-em-color'],
+  ['border', '--rlh-border-color'],
+  ['hover', '--rlh-hover-bg'],
+  ['selected', '--rlh-selected-bg'],
+  ['shadow', '--rlh-shadow-color'],
+  ['header', '--rlh-header-bg'],
+  ['input', '--rlh-input-bg'],
+  ['accent', '--rlh-accent-color'],
+  ['positive', '--rlh-green'],
+  ['negative', '--rlh-red'],
+  ['positiveBg', '--rlh-green-bg'],
+  ['negativeBg', '--rlh-red-bg'],
+  ['statusConstant', '--rlh-status-constant'],
+  ['statusSelective', '--rlh-status-selective'],
+  ['statusVectorized', '--rlh-status-vectorized'],
+];
+
+const THEME_VARIABLES_MAP = {};
+THEME_TOKEN_ENTRIES.forEach(([token, varName]) => {
+  THEME_VARIABLES_MAP[token] = varName;
+});
+
+export const THEME_VARIABLES = Object.freeze({ ...THEME_VARIABLES_MAP });
+export const THEME_TOKEN_LIST = Object.freeze(THEME_TOKEN_ENTRIES.map(([token]) => token));
+export const resolveThemeVarName = token =>
+  typeof token === 'string' && token ? THEME_VARIABLES_MAP[token] ?? null : null;
+
+const sanitizeThemeId = value => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+};
+
+const normalizeThemeClasses = classes => {
+  if (!classes) return [];
+  const list = Array.isArray(classes) ? classes : [classes];
+  const unique = [];
+  list.forEach(item => {
+    if (!item && item !== 0) return;
+    const str = String(item).trim();
+    if (!str) return;
+    if (!unique.includes(str)) unique.push(str);
+  });
+  return unique;
+};
+
+const themeRegistry = new Map();
+const themeOrder = [];
+const themeListeners = new Set();
+
+const themeState = {
+  activeId: 'dark',
+  fallbackId: 'dark',
+  pendingApplyId: null,
+  appliedClasses: [],
+  colorScheme: 'dark',
+  activeSnapshot: null,
+};
+
+const storeThemeConfig = config => {
+  themeRegistry.set(config.id, config);
+  if (!themeOrder.includes(config.id)) {
+    themeOrder.push(config.id);
+  }
+  themeOrder.sort((a, b) => {
+    const themeA = themeRegistry.get(a);
+    const themeB = themeRegistry.get(b);
+    if (!themeA || !themeB) return 0;
+    if (themeA.order !== themeB.order) return themeA.order - themeB.order;
+    return themeA.id.localeCompare(themeB.id);
+  });
+  return config;
+};
+
+const normalizeThemeConfig = rawConfig => {
+  if (!rawConfig || typeof rawConfig !== 'object') {
+    throw new Error('主题配置必须是对象');
+  }
+  const normalizedId = sanitizeThemeId(rawConfig.id ?? rawConfig.themeId ?? rawConfig.name);
+  if (!normalizedId) {
+    throw new Error('主题配置缺少 id');
+  }
+  const normalizedLabel =
+    typeof rawConfig.label === 'string' && rawConfig.label.trim() ? rawConfig.label.trim() : normalizedId;
+  const normalizedDescription =
+    typeof rawConfig.description === 'string' ? rawConfig.description.trim() : '';
+  const normalizedOrder =
+    typeof rawConfig.order === 'number' && !Number.isNaN(rawConfig.order)
+      ? rawConfig.order
+      : themeOrder.length;
+  const normalizedClasses = normalizeThemeClasses(rawConfig.panelClassList ?? rawConfig.classList);
+  const normalizedScheme = rawConfig.colorScheme === 'dark' ? 'dark' : 'light';
+  const metadata =
+    rawConfig.metadata && typeof rawConfig.metadata === 'object' ? { ...rawConfig.metadata } : {};
+
+  return Object.freeze({
+    id: normalizedId,
+    label: normalizedLabel,
+    description: normalizedDescription,
+    order: normalizedOrder,
+    panelClassList: Object.freeze(normalizedClasses),
+    colorScheme: normalizedScheme,
+    metadata: Object.freeze(metadata),
+  });
+};
+
+const applyThemeToPanel = themeConfig => {
+  try {
+    const parentDoc = getParentDoc();
+    if (!parentDoc) return false;
+    const panelEl = parentDoc.getElementById(PANEL_ID);
+    if (!panelEl) return false;
+
+    if (Array.isArray(themeState.appliedClasses) && themeState.appliedClasses.length) {
+      themeState.appliedClasses.forEach(className => {
+        if (className) panelEl.classList.remove(className);
+      });
+    }
+
+    const classesToApply = Array.isArray(themeConfig.panelClassList) ? [...themeConfig.panelClassList] : [];
+    classesToApply.forEach(className => {
+      if (className) panelEl.classList.add(className);
+    });
+    themeState.appliedClasses = classesToApply;
+
+    panelEl.dataset.rlhTheme = themeConfig.id;
+    if (themeConfig.colorScheme) {
+      panelEl.dataset.rlhThemeScheme = themeConfig.colorScheme;
+    } else {
+      delete panelEl.dataset.rlhThemeScheme;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('[RegexLoreHub] 应用主题到面板失败：', error);
+    return false;
+  }
+};
+
+const emitThemeChange = (themeConfig, previousTheme, reason) => {
+  const payload = {
+    theme: themeConfig,
+    previous: previousTheme,
+    reason: reason || 'manual',
+  };
+
+  themeListeners.forEach(listener => {
+    if (typeof listener !== 'function') return;
+    try {
+      listener(payload);
+    } catch (error) {
+      console.warn('[RegexLoreHub] 主题监听器执行失败：', error);
+    }
+  });
+
+  try {
+    const parentWin = getParentWin();
+    const CustomEvt = parentWin?.CustomEvent || (typeof CustomEvent === 'function' ? CustomEvent : null);
+    if (parentWin && typeof parentWin.dispatchEvent === 'function' && CustomEvt) {
+      parentWin.dispatchEvent(new CustomEvt('RegexLoreHubThemeChange', { detail: payload }));
+    } else if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && CustomEvt) {
+      window.dispatchEvent(new CustomEvt('RegexLoreHubThemeChange', { detail: payload }));
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 派发主题事件失败：', error);
+  }
+};
+
+const ensureActiveThemeInternal = () => {
+  const byActive = themeRegistry.get(themeState.activeId);
+  if (byActive) {
+    themeState.activeSnapshot = byActive;
+    themeState.colorScheme = byActive.colorScheme;
+    return byActive;
+  }
+  const fallback = themeRegistry.get(themeState.fallbackId);
+  if (fallback) {
+    themeState.activeId = fallback.id;
+    themeState.activeSnapshot = fallback;
+    themeState.colorScheme = fallback.colorScheme;
+    return fallback;
+  }
+  const first = themeOrder.length ? themeRegistry.get(themeOrder[0]) : null;
+  if (first) {
+    themeState.fallbackId = first.id;
+    themeState.activeId = first.id;
+    themeState.activeSnapshot = first;
+    themeState.colorScheme = first.colorScheme;
+  }
+  return first ?? null;
+};
+
+export const registerTheme = rawConfig => {
+  try {
+    const normalized = normalizeThemeConfig(rawConfig);
+    storeThemeConfig(normalized);
+    if (!themeState.fallbackId) {
+      themeState.fallbackId = normalized.id;
+    }
+    if (!themeState.activeId) {
+      themeState.activeId = normalized.id;
+    }
+    if (themeState.activeId === normalized.id) {
+      themeState.activeSnapshot = normalized;
+      themeState.colorScheme = normalized.colorScheme;
+    }
+    return normalized;
+  } catch (error) {
+    console.error('[RegexLoreHub] 注册主题失败：', error);
+    return null;
+  }
+};
+
+export const getThemeDefinition = themeId => {
+  const normalizedId = sanitizeThemeId(themeId);
+  if (!normalizedId) return null;
+  return themeRegistry.get(normalizedId) ?? null;
+};
+
+export const listThemes = () => themeOrder.map(id => themeRegistry.get(id)).filter(Boolean);
+
+export const getActiveTheme = () => ensureActiveThemeInternal();
+
+export const getThemeLabel = themeId => {
+  const theme = getThemeDefinition(themeId);
+  if (theme && typeof theme.label === 'string' && theme.label.trim()) return theme.label.trim();
+  if (typeof themeId === 'string' && themeId.trim()) return themeId.trim();
+  return '';
+};
+
+export const setActiveTheme = (themeId, options = {}) => {
+  const { reason = 'manual', applyToDom = true, silent = false } = options ?? {};
+  const normalizedId = sanitizeThemeId(themeId);
+  const resolvedId = normalizedId === 'default' ? 'gruvbox-light-hard' : normalizedId;
+  const targetTheme =
+    (resolvedId && themeRegistry.get(resolvedId)) || ensureActiveThemeInternal();
+  if (!targetTheme) return null;
+
+  const previousTheme = ensureActiveThemeInternal();
+  const changed = !previousTheme || previousTheme.id !== targetTheme.id;
+
+  themeState.activeId = targetTheme.id;
+  themeState.activeSnapshot = targetTheme;
+  themeState.colorScheme = targetTheme.colorScheme;
+
+  if (applyToDom) {
+    const applied = applyThemeToPanel(targetTheme);
+    themeState.pendingApplyId = applied ? null : targetTheme.id;
+  } else {
+    themeState.pendingApplyId = targetTheme.id;
+  }
+
+  if (changed && !silent) {
+    emitThemeChange(targetTheme, previousTheme, reason);
+  }
+
+  return targetTheme;
+};
+
+export const syncThemeToDom = () => {
+  const activeTheme = ensureActiveThemeInternal();
+  if (!activeTheme) return false;
+  const applied = applyThemeToPanel(activeTheme);
+  themeState.pendingApplyId = applied ? null : activeTheme.id;
+  return applied;
+};
+
+export const onThemeChange = listener => {
+  if (typeof listener !== 'function') return () => {};
+  themeListeners.add(listener);
+  return () => themeListeners.delete(listener);
+};
+
+registerTheme({
+  id: 'dark',
+  label: '暗色主题',
+  description: '深色界面，继承现有 dark 样式。',
+  order: 0,
+  panelClassList: ['dark', 'rlh-theme-dark'],
+  colorScheme: 'dark',
+});
+
+registerTheme({
+  id: 'gruvbox-light-hard',
+  label: 'Gruvbox',
+  description: '采用 Gruvbox Light Hard 调色板的浅色主题。',
+  order: 1,
+  panelClassList: ['rlh-theme-gruvbox'],
+  colorScheme: 'light',
+  metadata: { family: 'gruvbox', variant: 'light-hard' },
+});
+
+ensureActiveThemeInternal();
+
 const WORLD_BOOK_STATUS_DEFINITIONS = [
   {
     id: 'constant',
@@ -85,7 +389,7 @@ const WORLD_BOOK_STATUS_DEFINITIONS = [
     description: '忽略关键词限制，只要条目启用且满足概率就始终尝试激活。',
     strategyType: 'constant',
     toastLabel: '永久激活',
-    accentVar: '--rlh-status-constant',
+    accentVar: THEME_VARIABLES.statusConstant,
     badgeClass: 'rlh-status-badge--constant',
     order: 0,
   },
@@ -96,7 +400,7 @@ const WORLD_BOOK_STATUS_DEFINITIONS = [
     description: '匹配主要/次要关键词后激活，可结合概率与扫描深度控制触发。',
     strategyType: 'selective',
     toastLabel: '关键词触发',
-    accentVar: '--rlh-status-selective',
+    accentVar: THEME_VARIABLES.statusSelective,
     badgeClass: 'rlh-status-badge--selective',
     order: 1,
   },
@@ -107,7 +411,7 @@ const WORLD_BOOK_STATUS_DEFINITIONS = [
     description: '依赖向量相似度激活，适用于语义召回场景。',
     strategyType: 'vectorized',
     toastLabel: '向量化',
-    accentVar: '--rlh-status-vectorized',
+    accentVar: THEME_VARIABLES.statusVectorized,
     badgeClass: 'rlh-status-badge--vectorized',
     order: 2,
   },
@@ -197,6 +501,7 @@ export const appState = {
   lorebooks: { character: [] },
   chatLorebook: null,
   allLorebooks: [],
+  theme: themeState,
   lorebookEntries: new Map(),
   pendingLorebookUpdates: new Map(), // 待保存的世界书字段更新
   pendingRegexUpdates: new Set(), // 待保存的正则更新
@@ -243,6 +548,20 @@ const pushUniqueString = (targetSet, rawValue) => {
   targetSet.add(str);
 };
 
+export const encodeSelectionPart = value => {
+  if (value === undefined || value === null) return '';
+  return encodeURIComponent(String(value));
+};
+
+export const decodeSelectionPart = value => {
+  if (value === undefined || value === null) return '';
+  try {
+    return decodeURIComponent(String(value));
+  } catch {
+    return String(value);
+  }
+};
+
 /**
  * 基于世界书名称生成多选键；当名称无效时返回空字符串，调用方需据此跳过写入。
  * @param {unknown} name 待规范化的世界书名称或对象。
@@ -250,8 +569,23 @@ const pushUniqueString = (targetSet, rawValue) => {
  */
 export const buildBookSelectionKey = name => {
   const normalized = normalizeLorebookName(name);
-  return normalized ? `book:${normalized}` : '';
+  return normalized ? `book:${encodeSelectionPart(normalized)}` : '';
 };
+
+export const buildLoreSelectionKey = (bookName, entryId) => {
+  const normalizedBook = normalizeLorebookName(bookName);
+  if (!normalizedBook) return '';
+  const entryPart = entryId ?? '';
+  return `lore:${encodeSelectionPart(normalizedBook)}:${encodeSelectionPart(entryPart)}`;
+};
+
+export const buildLoreSelectionPrefix = bookName => {
+  const normalizedBook = normalizeLorebookName(bookName);
+  if (!normalizedBook) return 'lore:';
+  return `lore:${encodeSelectionPart(normalizedBook)}:`;
+};
+
+export const buildRegexSelectionKey = identifier => `regex:${encodeSelectionPart(identifier ?? '')}`;
 
 export const resolveLorebookBindingStats = bookOrName => {
   const charNames = new Set();

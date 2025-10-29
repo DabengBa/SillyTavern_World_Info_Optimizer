@@ -84,6 +84,84 @@ const LEGACY_POSITION_ALIASES = Object.freeze({
   depth_user: 'at_depth_as_user',
 });
 
+const THEME_SETTINGS_NAMESPACE = 'regexLoreHub';
+const THEME_SETTINGS_KEY = 'regexLoreHub.themeId';
+
+export const loadThemePreference = errorCatched(async () => {
+  let storedTheme = null;
+
+  try {
+    const helper = getTavernHelper();
+    const extensionSettings = helper?.extensionSettings;
+    if (extensionSettings && typeof extensionSettings === 'object') {
+      const container =
+        extensionSettings[THEME_SETTINGS_NAMESPACE] ??
+        extensionSettings.regexLoreHub ??
+        extensionSettings.RegexLoreHub ??
+        null;
+      if (container && typeof container === 'object') {
+        const candidate =
+          container.themeId ?? container.theme ?? container.theme_id ?? container.themeName;
+        if (typeof candidate === 'string' && candidate.trim()) {
+          storedTheme = candidate.trim();
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 读取 extensionSettings 主题偏好失败：', error);
+  }
+
+  if (!storedTheme) {
+    try {
+      const parentWin = getParentWin();
+      const rawValue = parentWin?.localStorage?.getItem(THEME_SETTINGS_KEY);
+      if (typeof rawValue === 'string' && rawValue.trim()) {
+        storedTheme = rawValue.trim();
+      }
+    } catch (error) {
+      console.warn('[RegexLoreHub] 读取 localStorage 主题偏好失败：', error);
+    }
+  }
+
+  return storedTheme ?? null;
+}, 'RegexLoreHubThemeStorage');
+
+export const saveThemePreference = errorCatched(async themeId => {
+  const normalized = typeof themeId === 'string' ? themeId.trim() : '';
+  if (!normalized) return false;
+
+  let persisted = false;
+
+  try {
+    const helper = getTavernHelper();
+    const extensionSettings = helper?.extensionSettings;
+    if (extensionSettings && typeof extensionSettings === 'object') {
+      const namespaceKey = THEME_SETTINGS_NAMESPACE;
+      const container =
+        extensionSettings[namespaceKey] && typeof extensionSettings[namespaceKey] === 'object'
+          ? extensionSettings[namespaceKey]
+          : (extensionSettings[namespaceKey] = {});
+      container.themeId = normalized;
+      persisted = true;
+      if (helper?.builtin?.saveSettings) {
+        await helper.builtin.saveSettings();
+      }
+    }
+  } catch (error) {
+    console.warn('[RegexLoreHub] 写入 extensionSettings 主题偏好失败：', error);
+  }
+
+  try {
+    const parentWin = getParentWin();
+    parentWin?.localStorage?.setItem(THEME_SETTINGS_KEY, normalized);
+    persisted = true;
+  } catch (error) {
+    console.warn('[RegexLoreHub] 写入 localStorage 主题偏好失败：', error);
+  }
+
+  return persisted;
+}, 'RegexLoreHubThemeStorage');
+
 const cloneEntry = source => (source ? JSON.parse(JSON.stringify(source)) : {});
 
 const sanitizeKeyArray = keys =>

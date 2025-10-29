@@ -27,6 +27,17 @@ import {
   WORLD_BOOK_STATUS_LIST,
   DEFAULT_WORLD_BOOK_STATUS,
   resolveWorldbookStatus,
+  decodeSelectionPart,
+  buildBookSelectionKey,
+  buildLoreSelectionKey,
+  buildLoreSelectionPrefix,
+  buildRegexSelectionKey,
+  THEME_MENU_WRAPPER_ID,
+  THEME_MENU_ID,
+  THEME_TOGGLE_BTN_ID,
+  THEME_OPTION_CLASS,
+  setActiveTheme,
+  getActiveTheme,
 } from '../../core.js';
 
 import {
@@ -41,6 +52,7 @@ import {
   updateWorldbookEntries,
   updateWorldbookEntriesStatus,
   updateRegexOrderMetadata,
+  saveThemePreference,
 } from '../../dataLayer.js';
 
 import { renderContent, getViewContext, getContextInstanceKey } from '../render/index.js';
@@ -138,23 +150,25 @@ export function createUIHandlers(deps = {}) {
     const remainder = key.slice(firstSepIndex + 1);
 
     if (type === 'book') {
-      return { type, bookName: remainder };
+      return { type, bookName: decodeSelectionPart(remainder) };
     }
 
     if (type === 'lore') {
       const lastSepIndex = remainder.lastIndexOf(':');
       if (lastSepIndex === -1) {
-        return { type, bookName: remainder, entryId: null };
+        return { type, bookName: decodeSelectionPart(remainder), entryId: null };
       }
+      const rawBook = remainder.slice(0, lastSepIndex);
+      const rawEntryId = remainder.slice(lastSepIndex + 1);
       return {
         type,
-        bookName: remainder.slice(0, lastSepIndex),
-        entryId: remainder.slice(lastSepIndex + 1),
+        bookName: decodeSelectionPart(rawBook),
+        entryId: decodeSelectionPart(rawEntryId),
       };
     }
 
     if (type === 'regex') {
-      return { type, regexId: remainder };
+      return { type, regexId: decodeSelectionPart(remainder) };
     }
 
     return { type, raw: remainder };
@@ -370,17 +384,17 @@ export function createUIHandlers(deps = {}) {
     if ($container.hasClass('rlh-book-group')) {
       if (appState.multiSelectTarget !== 'book') return null;
       const bookName = $container.data('book-name');
-      return bookName ? `book:${bookName}` : null;
+      return bookName ? buildBookSelectionKey(bookName) : null;
     }
     if ($container.hasClass('rlh-item-container')) {
       const itemType = $container.data('type');
       const itemId = $container.data('id');
       if (itemType === 'lore' && appState.multiSelectTarget === 'entry') {
         const bookName = $container.data('book-name');
-        return bookName != null && itemId != null ? `lore:${bookName}:${itemId}` : null;
+        return bookName != null && itemId != null ? buildLoreSelectionKey(bookName, itemId) : null;
       }
       if (itemType === 'regex' && appState.multiSelectTarget === 'regex') {
-        return itemId != null ? `regex:${itemId}` : null;
+        return itemId != null ? buildRegexSelectionKey(itemId) : null;
       }
     }
     return null;
@@ -699,8 +713,8 @@ export function createUIHandlers(deps = {}) {
     if (!$menu.length) return;
     const isOpen = $menu.attr('data-open') === 'true';
     if (isOpen) closeSortMenu();
-    else openSortMenu();
-  });
+  else openSortMenu();
+});
 
 
 
@@ -712,6 +726,106 @@ export function createUIHandlers(deps = {}) {
     const context = getViewContext();
     setActiveSortMode(context, sortValue);
     renderContent();
+  });
+
+
+
+  let themeMenuListenersActive = false;
+
+  const getThemeMenuElements = () => ({
+    $wrapper: $(`#${THEME_MENU_WRAPPER_ID}`, parentDoc),
+    $menu: $(`#${THEME_MENU_ID}`, parentDoc),
+    $button: $(`#${THEME_TOGGLE_BTN_ID}`, parentDoc),
+  });
+
+  function handleThemeMenuOutsideClick(event) {
+    if (!themeMenuListenersActive) return;
+    const { $wrapper } = getThemeMenuElements();
+    if (!$wrapper.length) return;
+    const target = event?.target ?? null;
+    if (target && $wrapper[0]?.contains(target)) return;
+    closeThemeMenu();
+  }
+
+  function handleThemeMenuKeydown(event) {
+    if (event.key !== 'Escape') return;
+    const { $button } = getThemeMenuElements();
+    closeThemeMenu();
+    if ($button.length) {
+      $button.trigger('focus');
+    }
+  }
+
+  function attachThemeMenuListeners() {
+    if (themeMenuListenersActive) return;
+    $(parentDoc).on('click.rlhThemeMenu', handleThemeMenuOutsideClick);
+    $(parentDoc).on('keydown.rlhThemeMenu', handleThemeMenuKeydown);
+    themeMenuListenersActive = true;
+  }
+
+  function detachThemeMenuListeners() {
+    if (!themeMenuListenersActive) return;
+    $(parentDoc).off('click.rlhThemeMenu', handleThemeMenuOutsideClick);
+    $(parentDoc).off('keydown.rlhThemeMenu', handleThemeMenuKeydown);
+    themeMenuListenersActive = false;
+  }
+
+  function closeThemeMenu() {
+    const { $wrapper, $menu, $button } = getThemeMenuElements();
+    if ($wrapper.length) {
+      $wrapper.removeClass('open');
+    }
+    if ($menu.length) {
+      $menu.attr('data-open', 'false');
+    }
+    if ($button.length) {
+      $button.attr('aria-expanded', 'false');
+    }
+    detachThemeMenuListeners();
+  }
+
+  function openThemeMenu() {
+    const { $wrapper, $menu, $button } = getThemeMenuElements();
+    if (!$wrapper.length || !$menu.length) return;
+    $wrapper.addClass('open');
+    $menu.attr('data-open', 'true');
+    if ($button.length) {
+      $button.attr('aria-expanded', 'true');
+    }
+    attachThemeMenuListeners();
+  }
+
+  const handleThemeMenuToggle = errorCatched(event => {
+    event.preventDefault();
+    event.stopPropagation();
+    const { $wrapper } = getThemeMenuElements();
+    if (!$wrapper.length) return;
+    const isOpen = $wrapper.hasClass('open');
+    if (isOpen) closeThemeMenu();
+    else openThemeMenu();
+  });
+
+  const handleThemeOptionSelect = errorCatched(async event => {
+    event.preventDefault();
+    const $option = $(event.currentTarget);
+    if (!$option.hasClass(THEME_OPTION_CLASS)) {
+      closeThemeMenu();
+      return;
+    }
+    const rawThemeId = $option.data('themeId');
+    const themeId = typeof rawThemeId === 'string' || typeof rawThemeId === 'number' ? String(rawThemeId).trim() : '';
+    if (!themeId) {
+      closeThemeMenu();
+      return;
+    }
+    const currentTheme = getActiveTheme();
+    if (!currentTheme || currentTheme.id !== themeId) {
+      const theme = setActiveTheme(themeId, { reason: 'user' });
+      if (theme) {
+        await saveThemePreference(theme.id);
+      }
+    }
+    closeThemeMenu();
   });
 
 
@@ -1410,7 +1524,7 @@ const handleTabRefresh = errorCatched(async tabId => {
       if (result && result.deleted_entries && result.deleted_entries.length > 0) {
         deletedEntriesCount += result.deleted_entries.length;
         safeSetLorebookEntries(bookName, result.worldbook.map(normalizeWorldbookEntry));
-        uids.forEach(uid => appState.selectedItems.delete(`lore:${bookName}:${uid}`));
+        uids.forEach(uid => appState.selectedItems.delete(buildLoreSelectionKey(bookName, uid)));
       }
     }
 
@@ -1422,9 +1536,10 @@ const handleTabRefresh = errorCatched(async tabId => {
         deletedBooksCount++;
         appState.allLorebooks = appState.allLorebooks.filter(b => b.name !== bookName);
         safeDeleteLorebookEntries(bookName);
-        appState.selectedItems.delete(`book:${bookName}`);
-        for (const key of appState.selectedItems) {
-          if (key.startsWith(`lore:${bookName}:`)) {
+        appState.selectedItems.delete(buildBookSelectionKey(bookName));
+        const lorePrefix = buildLoreSelectionPrefix(bookName);
+        for (const key of [...appState.selectedItems]) {
+          if (key.startsWith(lorePrefix)) {
             appState.selectedItems.delete(key);
           }
         }
@@ -1449,7 +1564,7 @@ const handleTabRefresh = errorCatched(async tabId => {
       appState.regexes.character = appState.regexes.character.filter(r => !selectedRegexIds.has(String(r.id)));
       updateRegexOrderMetadata(appState.regexes.global);
       updateRegexOrderMetadata(appState.regexes.character);
-      selectedRegexIds.forEach(id => appState.selectedItems.delete(`regex:${id}`));
+      selectedRegexIds.forEach(id => appState.selectedItems.delete(buildRegexSelectionKey(id)));
     }
 
     progressToast.remove();
@@ -1502,7 +1617,7 @@ const handleTabRefresh = errorCatched(async tabId => {
     appState.multiSelectMode = true;
     appState.multiSelectTarget = 'book';
     appState.selectedItems.clear();
-    orphanBooks.forEach(name => appState.selectedItems.add('book:' + name));
+    orphanBooks.forEach(name => appState.selectedItems.add(buildBookSelectionKey(name)));
     renderContent();
 
     const confirmText = '将删除 ' + orphanBooks.length + ' 本未启用且未绑定角色卡的世界书。因API限制，无法直接获取聊天绑定世界书，存在误删该世界书的可能。确定继续吗？';
@@ -1542,13 +1657,13 @@ const handleTabRefresh = errorCatched(async tabId => {
           if (appState.activeBookName === bookName) {
             appState.activeBookName = null;
           }
-          appState.selectedItems.delete('book:' + bookName);
-          const remainingKeys = [...appState.selectedItems];
-          remainingKeys.forEach(key => {
-            if (key.startsWith('lore:' + bookName + ':')) {
+          appState.selectedItems.delete(buildBookSelectionKey(bookName));
+          const lorePrefix = buildLoreSelectionPrefix(bookName);
+          for (const key of [...appState.selectedItems]) {
+            if (key.startsWith(lorePrefix)) {
               appState.selectedItems.delete(key);
             }
-          });
+          }
         } else {
           failedBooks.push(bookName);
         }
@@ -1569,7 +1684,7 @@ const handleTabRefresh = errorCatched(async tabId => {
 
     if (failedBooks.length > 0) {
       appState.selectedItems.clear();
-      failedBooks.forEach(name => appState.selectedItems.add('book:' + name));
+      failedBooks.forEach(name => appState.selectedItems.add(buildBookSelectionKey(name)));
       await showModal({ type: 'alert', title: '部分删除失败', text: '以下世界书未能删除：' + failedBooks.join('、') });
     } else {
       appState.selectedItems.clear();
@@ -1873,6 +1988,10 @@ const handleTabRefresh = errorCatched(async tabId => {
     handleSortMenuToggle,
 
     handleSortOptionSelect,
+
+    handleThemeMenuToggle,
+
+    handleThemeOptionSelect,
 
     handlePositionMenuToggle,
 

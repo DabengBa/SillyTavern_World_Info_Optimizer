@@ -29,6 +29,10 @@ import {
   resolveWorldbookStatus,
   UI_TEXTS,
   buildBookSelectionKey,
+  buildLoreSelectionKey,
+  buildLoreSelectionPrefix,
+  buildRegexSelectionKey,
+  decodeSelectionPart,
 } from '../../core.js';
 import { saveAllChanges } from '../../dataLayer.js';
 
@@ -128,9 +132,11 @@ const buildPositionMenu = context => {
     if (typeof key !== 'string' || !key.startsWith('lore:')) return;
     const lastSep = key.lastIndexOf(':');
     if (lastSep === -1) return;
-    const name = key.slice(5, lastSep);
-    const entryId = key.slice(lastSep + 1);
-    if (!entryId) return;
+    const encodedName = key.slice(5, lastSep);
+    const encodedEntryId = key.slice(lastSep + 1);
+    const name = decodeSelectionPart(encodedName);
+    const entryId = decodeSelectionPart(encodedEntryId);
+    if (!name || entryId === '') return;
     if (!selectionMap.has(name)) selectionMap.set(name, []);
     selectionMap.get(name).push(entryId);
   });
@@ -267,9 +273,11 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
             if (typeof key !== 'string' || !key.startsWith('lore:')) return;
             const lastSep = key.lastIndexOf(':');
             if (lastSep === -1) return;
-            const name = key.slice(5, lastSep);
-            const entryId = key.slice(lastSep + 1);
-            if (!entryId) return;
+            const encodedName = key.slice(5, lastSep);
+            const encodedEntryId = key.slice(lastSep + 1);
+            const name = decodeSelectionPart(encodedName);
+            const entryId = decodeSelectionPart(encodedEntryId);
+            if (!name || entryId === '') return;
             if (!selectionMap.has(name)) selectionMap.set(name, []);
             selectionMap.get(name).push(entryId);
           });
@@ -479,10 +487,11 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
     const entries = resolvedBookName ? safeGetLorebookEntries(resolvedBookName) : [];
     const hasEntries = entries.length > 0;
     const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
+    const lorePrefix = buildLoreSelectionPrefix(resolvedBookName);
     const hasSelection =
       isEntryMultiSelect &&
       entries.length > 0 &&
-      [...appState.selectedItems].some(key => key.startsWith(`lore:${resolvedBookName}:`));
+      [...appState.selectedItems].some(key => typeof key === 'string' && key.startsWith(lorePrefix));
     const shouldEnable = hasEntries && (!isEntryMultiSelect || hasSelection);
     const tooltip = !hasEntries
       ? (resolvedBookName ? `「${resolvedBookName}」暂无条目可调整` : '请先打开需要统一状态的世界书')
@@ -812,7 +821,8 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
           dragHandleDisabledAttrs
         }><i class="fa-solid fa-grip-vertical"></i></span>`
       : '';
-  const selectionKey = options.selectionKey ?? (isLore ? `lore:${bookName}:${id}` : `regex:${id}`);
+  const selectionKey =
+    options.selectionKey ?? (isLore ? buildLoreSelectionKey(bookName, id) : buildRegexSelectionKey(id));
   const target = appState.multiSelectTarget;
   const selectionAllowed =
     appState.multiSelectMode &&

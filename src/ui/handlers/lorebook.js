@@ -9,6 +9,9 @@ import {
   get$,
   getParentDoc,
   getParentWin,
+  escapeHtml,
+  decodeSelectionPart,
+  buildLoreSelectionPrefix,
   POSITION_MENU_ID,
   POSITION_MENU_BUTTON_ID,
   LOREBOOK_OPTIONS,
@@ -78,290 +81,545 @@ export function createLorebookHandlers(deps = {}) {
   });
 
 
-  const updateLinkedCharacters = errorCatched(async (oldBookName, newBookName, progressToast) => {
-  const linkedChars = appState.lorebookUsage.get(oldBookName) || [];
-  if (linkedChars.length === 0) return;
+  const updateLinkedCharacters = async (oldBookName, newBookName, progressToast, attemptInfo = {}) => {
+    const linkedChars = appState.lorebookUsage.get(oldBookName) || [];
+    if (linkedChars.length === 0) return;
 
-  const context = parentWin.SillyTavern.getContext();
-  const originalCharId = context.characterId;
-  let processedCount = 0;
-  const totalCount = linkedChars.length;
-  progressToast.update(`正在更新 ${totalCount} 个关联角色... (0/${totalCount})`);
+    const context = parentWin.SillyTavern.getContext();
+    const originalCharId = context.characterId;
+    let processedCount = 0;
+    const totalCount = linkedChars.length;
+    const { currentAttempt = 1, totalAttempts = 1 } = attemptInfo;
+    progressToast?.update?.(
+      `正在更新 ${totalCount} 个关联角色... (${processedCount}/${totalCount})（尝试 ${currentAttempt}/${totalAttempts}）`,
+    );
 
-  for (const charName of linkedChars) {
+    const failedCharacters = [];
+
     try {
-      // 使用正确的方法获取角色索引
-      const charIndex =
-        parentWin.Character?.findCharacterIndex?.(charName) ??
-        context.characters.findIndex(c => c.name === charName);
-      if (charIndex === -1) {
-        console.warn(`[RegexLoreHub] Character "${charName}" not found, skipping...`);
-        continue;
-      }
+      for (const charName of linkedChars) {
+        try {
+          const charIndex =
+            parentWin.Character?.findCharacterIndex?.(charName) ??
+            context.characters.findIndex(c => c.name === charName);
+          if (charIndex === -1) {
+            console.warn(`[RegexLoreHub] Character "${charName}" not found, skipping...`);
+            continue;
+          }
 
-      console.log(`[RegexLoreHub] Switching to character "${charName}" (index: ${charIndex})`);
-      await context.selectCharacterById(charIndex);
+          console.log(`[RegexLoreHub] Switching to character "${charName}" (index: ${charIndex})`);
+          await context.selectCharacterById(charIndex);
 
-      const charBooks = await TavernAPI.getCharWorldbookNames({ name: charName });
-      if (!charBooks) {
-        console.warn(`[RegexLoreHub] Failed to get worldbooks for character "${charName}"`);
-        continue;
-      }
+          const charBooks = await TavernAPI.getCharWorldbookNames({ name: charName });
+          if (!charBooks) {
+            console.warn(`[RegexLoreHub] Failed to get worldbooks for character "${charName}"`);
+            failedCharacters.push({ name: charName, error: new Error('无法获取世界书列表') });
+            continue;
+          }
 
-      console.log(`[RegexLoreHub] Current worldbooks for "${charName}":`, charBooks);
-      let updated = false;
-      if (charBooks.primary === oldBookName) {
-        console.log(`[RegexLoreHub] Updating primary lorebook from "${oldBookName}" to "${newBookName}"`);
-        charBooks.primary = newBookName;
-        updated = true;
-      }
-      if (charBooks.additional) {
-        const index = charBooks.additional.indexOf(oldBookName);
-        if (index > -1) {
-          console.log(
-            `[RegexLoreHub] Updating additional lorebook at index ${index} from "${oldBookName}" to "${newBookName}"`,
-          );
-          charBooks.additional[index] = newBookName;
-          updated = true;
+          console.log(`[RegexLoreHub] Current worldbooks for "${charName}":`, charBooks);
+          let updated = false;
+          if (charBooks.primary === oldBookName) {
+            console.log(`[RegexLoreHub] Updating primary lorebook from "${oldBookName}" to "${newBookName}"`);
+            charBooks.primary = newBookName;
+            updated = true;
+          }
+          if (Array.isArray(charBooks.additional)) {
+            const index = charBooks.additional.indexOf(oldBookName);
+            if (index > -1) {
+              console.log(
+                `[RegexLoreHub] Updating additional lorebook at index ${index} from "${oldBookName}" to "${newBookName}"`,
+              );
+              charBooks.additional[index] = newBookName;
+              updated = true;
+            }
+          }
+
+          if (updated) {
+            console.log(`[RegexLoreHub] Saving updated lorebooks for "${charName}":`, charBooks);
+            await TavernAPI.rebindCharWorldbooks(charBooks);
+            console.log(`[RegexLoreHub] Successfully updated lorebooks for "${charName}"`);
+          } else {
+            console.log(`[RegexLoreHub] No updates needed for character "${charName}"`);
+          }
+        } catch (charError) {
+          console.error(`[RegexLoreHub] Failed to update lorebook for character "${charName}":`, charError);
+          failedCharacters.push({ name: charName, error: charError });
         }
+        processedCount++;
+        progressToast?.update?.(
+          `正在更新 ${totalCount} 个关联角色... (${processedCount}/${totalCount})（尝试 ${currentAttempt}/${totalAttempts}）`,
+        );
       }
-
-      if (updated) {
-        console.log(`[RegexLoreHub] Saving updated lorebooks for "${charName}":`, charBooks);
-        await TavernAPI.rebindCharWorldbooks(charBooks);
-        console.log(`[RegexLoreHub] Successfully updated lorebooks for "${charName}"`);
-      } else {
-        console.log(`[RegexLoreHub] No updates needed for character "${charName}"`);
+    } finally {
+      if (context.characterId !== originalCharId) {
+        await context.selectCharacterById(originalCharId);
       }
-    } catch (charError) {
-      console.error(`[RegexLoreHub] Failed to update lorebook for character "${charName}":`, charError);
     }
-    processedCount++;
-    progressToast.update(`正在更新 ${totalCount} 个关联角色... (${processedCount}/${totalCount})`);
-  }
 
-  if (context.characterId !== originalCharId) {
-    await context.selectCharacterById(originalCharId);
-  }
-  });
+    if (failedCharacters.length > 0) {
+      const names = failedCharacters.map(item => item.name).join(', ');
+      const aggregatedError = new Error(`以下角色的世界书绑定未成功更新：${names}`);
+      aggregatedError.details = failedCharacters;
+      throw aggregatedError;
+    }
+  };
 
 
 
   const handleRenameBook = errorCatched(async event => {
-  event.stopPropagation();
-  const $trigger = $(event.currentTarget);
-  const $bookSource = $trigger.closest('.rlh-book-group, .rlh-detail-view');
-  const isDetailView = $bookSource.hasClass('rlh-detail-view');
-  const oldName = $bookSource.data('book-name') || appState.activeBookName;
-  if (!oldName) return;
+    event.stopPropagation();
+    const $trigger = $(event.currentTarget);
+    const $bookSource = $trigger.closest('.rlh-book-group, .rlh-detail-view');
+    const isDetailView = $bookSource.hasClass('rlh-detail-view');
+    const oldName = $bookSource.data('book-name') || appState.activeBookName;
+    if (!oldName) return;
 
-  let newName;
-  try {
-    newName = await showModal({
-      type: 'prompt',
-      title: '重命名世界书',
-      text: '请输入新的世界书名称：',
-      value: oldName,
-    });
-  } catch {
-    return; // User cancelled
-  }
-
-  newName = newName.trim();
-  if (!newName || newName === oldName) {
-    return;
-  }
-
-  if (appState.allLorebooks.some(b => b.name === newName)) {
-    await showModal({ type: 'alert', title: '重命名失败', text: '该名称的世界书已存在，请选择其他名称。' });
-    return;
-  }
-
-  const linkedCharacters = appState.lorebookUsage.get(oldName) || [];
-  const isChatLinked = appState.chatLorebook === oldName;
-  const chatCount = isChatLinked ? 1 : 0;
-  const totalBindings = linkedCharacters.length + chatCount;
-
-  console.log(
-    `[RegexLoreHub] Renaming lorebook "${oldName}" to "${newName}", linked characters:`,
-    linkedCharacters,
-    'chat linked:',
-    isChatLinked,
-  );
-
-  let confirmText = `此操作将更新 ${totalBindings} 个绑定关系`;
-  if (linkedCharacters.length > 0) {
-    confirmText += `，需要临时切换到 ${linkedCharacters.length} 个关联角色卡来更新世界书链接`;
-  }
-  confirmText += `，期间请勿操作。\n\n`;
-
-  if (linkedCharacters.length > 0) {
-    confirmText += `关联角色卡：${linkedCharacters.join(', ')}\n`;
-  }
-  if (isChatLinked) {
-    confirmText += `关联聊天：当前聊天\n`;
-  }
-
-  // 在全局世界书页面添加API限制提示
-  if (appState.activeTab === 'global-lore') {
-    confirmText += `\n⚠️ 重要提示：由于SillyTavern API限制，无法直接列出所有*聊天世界书*绑定。如果此世界书与*聊天*绑定，重命名后需要手动检查那些聊天绑定状态。\n`;
-  }
-
-  confirmText += `\n是否继续？`;
-
-  try {
-    await showModal({
-      type: 'confirm',
-      title: '确认重命名',
-      text: confirmText,
-    });
-  } catch {
-    return; // User cancelled
-  }
-
-  const progressToast = showProgressToast('开始重命名...');
-  try {
-    progressToast.update('正在创建新世界书...');
-    const createSuccess = await TavernAPI.createWorldbook(newName);
-    if (!createSuccess) {
-      throw new Error('创建新世界书文件失败。');
-    }
-
-    const oldEntries = [...safeGetLorebookEntries(oldName)];
-    if (oldEntries.length > 0) {
-      progressToast.update('正在复制条目...');
-      const entriesToCreate = oldEntries.map(entry => {
-        const newEntry = { ...entry };
-        delete newEntry.uid;
-        return newEntry;
+    let newName;
+    try {
+      newName = await showModal({
+        type: 'prompt',
+        title: '重命名世界书',
+        text: '请输入新的世界书名称：',
+        value: oldName,
       });
-      await TavernAPI.createWorldbookEntries(newName, entriesToCreate);
+    } catch {
+      return;
     }
 
-    await updateLinkedCharacters(oldName, newName, progressToast);
-
-    progressToast.update('正在更新全局设置...');
-    const enabledGlobalBooks = await TavernAPI.getGlobalWorldbookNames();
-    if (enabledGlobalBooks && enabledGlobalBooks.includes(oldName)) {
-      const newGlobalBooks = enabledGlobalBooks.map(name =>
-        name === oldName ? newName : name,
-      );
-      await TavernAPI.rebindGlobalWorldbooks(newGlobalBooks);
-      console.log(`[RegexLoreHub] Updated global lorebook settings from "${oldName}" to "${newName}"`);
-
-      // 验证全局设置更新是否成功
-      const updatedGlobalBooks = await TavernAPI.getGlobalWorldbookNames();
-      if (
-        !updatedGlobalBooks ||
-        !updatedGlobalBooks.includes(newName)
-      ) {
-        console.warn(`[RegexLoreHub] Global lorebook settings update verification failed for "${newName}"`);
-      }
+    newName = newName.trim();
+    if (!newName || newName === oldName) {
+      return;
     }
 
-    if (appState.chatLorebook === oldName) {
-      progressToast.update('正在更新聊天绑定...');
-      await TavernAPI.rebindChatWorldbook(newName);
-      appState.chatLorebook = newName;
-      console.log(`[RegexLoreHub] Updated chat lorebook from "${oldName}" to "${newName}"`);
-
-      // 立即验证聊天世界书更新是否成功
-      try {
-        const updatedChatLorebook = await TavernAPI.getChatWorldbookName();
-        if (updatedChatLorebook !== newName) {
-          console.warn(
-            `[RegexLoreHub] Chat lorebook update verification failed. Expected: "${newName}", Got: "${updatedChatLorebook}"`,
-          );
-          appState.chatLorebook = updatedChatLorebook;
-        }
-      } catch (verifyError) {
-        console.warn('[RegexLoreHub] Failed to verify chat lorebook update:', verifyError);
-      }
-    }
-
-    progressToast.update('正在更新内部映射...');
-    // 更新 lorebookUsage 映射
-    if (appState.lorebookUsage.has(oldName)) {
-      const linkedChars = appState.lorebookUsage.get(oldName);
-      appState.lorebookUsage.delete(oldName);
-      appState.lorebookUsage.set(newName, linkedChars);
-      console.log(`[RegexLoreHub] Updated lorebookUsage mapping from "${oldName}" to "${newName}"`);
-    }
-
-    progressToast.update('正在删除旧世界书...');
-    await TavernAPI.deleteWorldbook(oldName);
-
-    progressToast.update('正在刷新数据...');
-    // 保存当前聊天世界书状态，防止在数据刷新时丢失
-    const currentChatLorebook = appState.chatLorebook;
-    await loadAllData(true);
-
-    // 如果聊天世界书在刷新后发生了意外变化，恢复正确的状态
-    if (currentChatLorebook && appState.chatLorebook !== currentChatLorebook) {
-      console.log(`[RegexLoreHub] Restoring chat lorebook state after data refresh: "${currentChatLorebook}"`);
-      appState.chatLorebook = currentChatLorebook;
-    }
-
-    // 强制同步聊天世界书状态，确保在所有页面都能正确反映最新状态
-    try {
-      // 检查是否有活跃的聊天
-      const context = parentWin.SillyTavern.getContext() || {};
-      const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
-
-      if (hasActiveChat) {
-        const finalChatLorebook = await TavernAPI.getChatWorldbookName();
-        if (finalChatLorebook !== appState.chatLorebook) {
-          console.log(`[RegexLoreHub] Final chat lorebook sync: "${finalChatLorebook}"`);
-          appState.chatLorebook = finalChatLorebook;
-        }
-      }
-    } catch (syncError) {
-      console.warn('[RegexLoreHub] Failed to sync final chat lorebook state:', syncError);
-    }
-
-    progressToast.remove();
-    showToast('世界书重命名成功');
-    if (isDetailView) {
-      await handleEnterLorebookDetail(newName);
-    } else {
-      renderContent();
-    }
-  } catch (error) {
-    progressToast.remove();
-    console.error('[RegexLoreHub] Rename failed:', error);
-    await showModal({ type: 'alert', title: '重命名失败', text: `操作失败: ${error.message}` });
-    // Attempt to clean up the newly created book if rename fails midway
     if (appState.allLorebooks.some(b => b.name === newName)) {
-      await TavernAPI.deleteWorldbook(newName);
+      await showModal({ type: 'alert', title: '重命名失败', text: '该名称的世界书已存在，请选择其他名称。' });
+      return;
     }
 
-    // 保存当前聊天世界书状态，防止在错误恢复时丢失
-    const currentChatLorebook = appState.chatLorebook;
-    await loadAllData(true);
+    const linkedCharacters = appState.lorebookUsage.get(oldName) || [];
+    const isChatLinked = appState.chatLorebook === oldName;
+    const chatCount = isChatLinked ? 1 : 0;
+    const totalBindings = linkedCharacters.length + chatCount;
 
-    // 恢复聊天世界书状态（如果在错误处理过程中被意外更改）
-    if (currentChatLorebook && appState.chatLorebook !== currentChatLorebook) {
-      console.log(`[RegexLoreHub] Restoring chat lorebook state after error recovery: "${currentChatLorebook}"`);
-      appState.chatLorebook = currentChatLorebook;
+    console.log(
+      `[RegexLoreHub] Renaming lorebook "${oldName}" to "${newName}", linked characters:`,
+      linkedCharacters,
+      'chat linked:',
+      isChatLinked,
+    );
+
+    let confirmText = `此操作将更新 ${totalBindings} 个绑定关系`;
+    if (linkedCharacters.length > 0) {
+      confirmText += `，需要临时切换到 ${linkedCharacters.length} 个关联角色卡来更新世界书链接`;
+    }
+    confirmText += `，期间请勿操作。\n\n`;
+
+    if (linkedCharacters.length > 0) {
+      confirmText += `关联角色卡：${linkedCharacters.join(', ')}\n`;
+    }
+    if (isChatLinked) {
+      confirmText += `关联聊天：当前聊天\n`;
     }
 
-    // 在错误恢复后也强制同步聊天世界书状态
+    if (appState.activeTab === 'global-lore') {
+      confirmText += `\n⚠️ 重要提示：由于SillyTavern API限制，无法直接列出所有*聊天世界书*绑定。如果此世界书与*聊天*绑定，重命名后需要手动检查那些聊天绑定状态。\n`;
+    }
+
+    confirmText += `\n是否继续？`;
+
     try {
-      // 检查是否有活跃的聊天
-      const context = parentWin.SillyTavern.getContext() || {};
-      const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+      await showModal({
+        type: 'confirm',
+        title: '确认重命名',
+        text: confirmText,
+      });
+    } catch {
+      return;
+    }
 
-      if (hasActiveChat) {
-        const finalChatLorebook = await TavernAPI.getChatWorldbookName();
-        if (finalChatLorebook !== appState.chatLorebook) {
-          console.log(`[RegexLoreHub] Final chat lorebook sync after error recovery: "${finalChatLorebook}"`);
-          appState.chatLorebook = finalChatLorebook;
+    const RETRY_SETTINGS = { maxAttempts: 3, delayMs: 600 };
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const cleanupTasks = [];
+    const registerCleanupTask = (description, action) => {
+      const task = {
+        id: `cleanup-${cleanupTasks.length + 1}`,
+        description,
+        action,
+        status: 'pending',
+        lastError: null,
+      };
+      cleanupTasks.push(task);
+      return task;
+    };
+    const getStatusText = status => {
+      if (status === 'success') return '已完成';
+      if (status === 'failed') return '失败';
+      if (status === 'running') return '执行中';
+      return '待执行';
+    };
+    const runCleanupTasks = async (onlyFailed = false) => {
+      for (const task of cleanupTasks) {
+        if (onlyFailed && task.status === 'success') continue;
+        try {
+          task.status = 'running';
+          await task.action();
+          task.status = 'success';
+          task.lastError = null;
+        } catch (taskError) {
+          task.status = 'failed';
+          task.lastError = taskError;
         }
       }
-    } catch (syncError) {
-      console.warn('[RegexLoreHub] Failed to sync chat lorebook state after error recovery:', syncError);
+    };
+    const buildCleanupModalHtml = errorMessage => {
+      const tasksHtml = cleanupTasks.length
+        ? `<ul class="rlh-cleanup-task-list">${cleanupTasks
+            .map(
+              task =>
+                `<li class="rlh-cleanup-task" data-task-id="${task.id}" data-status="${task.status}">
+                  <span class="rlh-cleanup-task-title">${escapeHtml(task.description)}</span>
+                  <span class="rlh-cleanup-task-status">${escapeHtml(getStatusText(task.status))}</span>
+                  ${
+                    task.lastError
+                      ? `<div class="rlh-cleanup-task-error">${escapeHtml(task.lastError.message ?? String(task.lastError))}</div>`
+                      : ''
+                  }
+                </li>`,
+            )
+            .join('')}</ul>`
+        : '<p class="rlh-cleanup-empty">没有需要执行的清理任务。</p>';
+      return `
+        <div class="rlh-cleanup-modal">
+          <p class="rlh-cleanup-error">${escapeHtml(errorMessage)}</p>
+          ${tasksHtml}
+          ${
+            cleanupTasks.length
+              ? '<button type="button" class="rlh-modal-btn rlh-cleanup-retry">重试清理</button>'
+              : ''
+          }
+          <p class="rlh-cleanup-hint">如清理多次失败，请查看控制台或在 SillyTavern 中手动恢复。</p>
+        </div>
+      `;
+    };
+    const presentCleanupModal = async errorMessage => {
+      const modalPromise = showModal({
+        type: 'alert',
+        title: '重命名失败',
+        html: buildCleanupModalHtml(errorMessage),
+      });
+      setTimeout(() => {
+        const $overlay = $('.rlh-modal-overlay', parentDoc).last();
+        if ($overlay.length === 0) return;
+        const refreshList = () => {
+          cleanupTasks.forEach(task => {
+            const $item = $overlay.find(`[data-task-id="${task.id}"]`);
+            if ($item.length === 0) return;
+            $item.attr('data-status', task.status);
+            $item.find('.rlh-cleanup-task-status').text(getStatusText(task.status));
+            const $error = $item.find('.rlh-cleanup-task-error');
+            if (task.lastError) {
+              if ($error.length) {
+                $error.text(task.lastError.message ?? String(task.lastError));
+              } else {
+                $item.append(
+                  `<div class="rlh-cleanup-task-error">${escapeHtml(task.lastError.message ?? String(task.lastError))}</div>`,
+                );
+              }
+            } else if ($error.length) {
+              $error.remove();
+            }
+          });
+        };
+        refreshList();
+        const $retryBtn = $overlay.find('.rlh-cleanup-retry');
+        if ($retryBtn.length) {
+          $retryBtn.on('click', async e => {
+            e.preventDefault();
+            if ($retryBtn.prop('disabled')) return;
+            $retryBtn.prop('disabled', true).text('正在重试...');
+            await runCleanupTasks(true);
+            refreshList();
+            $retryBtn.prop('disabled', false).text('重试清理');
+          });
+        }
+      }, 0);
+      await modalPromise;
+    };
+    const retryOperation = async (operation, { description, onAttempt, onError } = {}) => {
+      let attempt = 0;
+      let lastError;
+      while (attempt < RETRY_SETTINGS.maxAttempts) {
+        attempt += 1;
+        onAttempt?.(attempt, RETRY_SETTINGS.maxAttempts);
+        try {
+          return await operation(attempt, RETRY_SETTINGS.maxAttempts);
+        } catch (error) {
+          lastError = error;
+          console.warn(`[RegexLoreHub] ${description} 第 ${attempt} 次尝试失败:`, error);
+          onError?.(error, attempt, RETRY_SETTINGS.maxAttempts);
+          if (attempt >= RETRY_SETTINGS.maxAttempts) break;
+          await sleep(RETRY_SETTINGS.delayMs);
+        }
+      }
+      throw lastError ?? new Error(`${description} 失败`);
+    };
+
+    const progressToast = showProgressToast('开始重命名...');
+    const currentChatLorebook = appState.chatLorebook;
+    let globalBooksBeforeUpdate = null;
+    let shouldVerifyGlobal = false;
+    let shouldVerifyChat = false;
+
+    try {
+      progressToast.update('正在创建新世界书...');
+      const createSuccess = await TavernAPI.createWorldbook(newName);
+      if (!createSuccess) {
+        throw new Error('创建新世界书文件失败。');
+      }
+      registerCleanupTask(`删除新建的世界书 "${newName}"`, async () => {
+        const names = (await TavernAPI.getWorldbooks()) ?? [];
+        if (!names.includes(newName)) return;
+        await TavernAPI.deleteWorldbook(newName);
+        const verifyNames = (await TavernAPI.getWorldbooks()) ?? [];
+        if (verifyNames.includes(newName)) {
+          throw new Error('新世界书仍存在，删除失败。');
+        }
+      });
+
+      const oldEntries = [...safeGetLorebookEntries(oldName)];
+      if (oldEntries.length > 0) {
+        const entriesToCreate = oldEntries.map(entry => {
+          const newEntry = { ...entry };
+          delete newEntry.uid;
+          delete newEntry.tempUid;
+          delete newEntry.temp_uid;
+          return newEntry;
+        });
+        await retryOperation(
+          async () => {
+            await TavernAPI.replaceWorldbook(newName, entriesToCreate);
+            const createdEntries = await TavernAPI.getWorldbook(newName);
+            const createdCount = Array.isArray(createdEntries) ? createdEntries.length : 0;
+            if (createdCount !== entriesToCreate.length) {
+              throw new Error(
+                `复制条目校验失败（期望 ${entriesToCreate.length} 条，实际 ${createdCount} 条）。`,
+              );
+            }
+          },
+          {
+            description: '复制条目',
+            onAttempt: (attempt, total) => {
+              const suffix = attempt > 1 ? `（尝试 ${attempt}/${total}）` : '';
+              progressToast.update(`正在复制条目...${suffix}`);
+            },
+          },
+        );
+      }
+
+      if (linkedCharacters.length > 0) {
+        await retryOperation(
+          async (attempt, total) =>
+            await updateLinkedCharacters(oldName, newName, progressToast, {
+              currentAttempt: attempt,
+              totalAttempts: total,
+            }),
+          {
+            description: '更新角色绑定',
+            onAttempt: (attempt, total) => {
+              const suffix = attempt > 1 ? `（尝试 ${attempt}/${total}）` : '';
+              progressToast.update(`正在更新角色绑定...${suffix}`);
+            },
+          },
+        );
+        registerCleanupTask(
+          `恢复 ${linkedCharacters.length} 个角色的世界书绑定`,
+          async () => {
+            await updateLinkedCharacters(newName, oldName, null, { currentAttempt: 1, totalAttempts: 1 });
+          },
+        );
+      }
+
+      progressToast.update('正在更新全局设置...');
+      const enabledGlobalBooks = await TavernAPI.getGlobalWorldbookNames();
+      const globalNeedsUpdate = Array.isArray(enabledGlobalBooks) && enabledGlobalBooks.includes(oldName);
+      let targetGlobalBooks = null;
+      if (globalNeedsUpdate) {
+        globalBooksBeforeUpdate = [...enabledGlobalBooks];
+        targetGlobalBooks = globalBooksBeforeUpdate.map(name => (name === oldName ? newName : name));
+        await retryOperation(
+          async () => {
+            await TavernAPI.rebindGlobalWorldbooks(targetGlobalBooks);
+            const verifyBooks = await TavernAPI.getGlobalWorldbookNames();
+            if (
+              !Array.isArray(verifyBooks) ||
+              !verifyBooks.includes(newName) ||
+              verifyBooks.includes(oldName)
+            ) {
+              throw new Error('全局世界书列表更新校验失败。');
+            }
+          },
+          {
+            description: '更新全局设置',
+            onAttempt: (attempt, total) => {
+              const suffix = attempt > 1 ? `（尝试 ${attempt}/${total}）` : '';
+              progressToast.update(`正在更新全局设置...${suffix}`);
+            },
+          },
+        );
+        registerCleanupTask('回滚全局世界书绑定', async () => {
+          if (!Array.isArray(globalBooksBeforeUpdate)) return;
+          await TavernAPI.rebindGlobalWorldbooks(globalBooksBeforeUpdate);
+          const verifyBooks = await TavernAPI.getGlobalWorldbookNames();
+          if (
+            !Array.isArray(verifyBooks) ||
+            verifyBooks.includes(newName) ||
+            !verifyBooks.includes(oldName)
+          ) {
+            throw new Error('全局世界书回滚校验失败。');
+          }
+        });
+        shouldVerifyGlobal = true;
+      }
+
+      if (isChatLinked) {
+        await retryOperation(
+          async () => {
+            await TavernAPI.rebindChatWorldbook(newName);
+            const verifyChat = await TavernAPI.getChatWorldbookName();
+            if (verifyChat !== newName) {
+              throw new Error(`聊天世界书仍为 ${verifyChat ?? '未绑定'}`);
+            }
+          },
+          {
+            description: '更新聊天绑定',
+            onAttempt: (attempt, total) => {
+              const suffix = attempt > 1 ? `（尝试 ${attempt}/${total}）` : '';
+              progressToast.update(`正在更新聊天绑定...${suffix}`);
+            },
+          },
+        );
+        appState.chatLorebook = newName;
+        registerCleanupTask('恢复聊天世界书绑定', async () => {
+          await TavernAPI.rebindChatWorldbook(oldName);
+          const verifyChat = await TavernAPI.getChatWorldbookName();
+          if (verifyChat !== oldName) {
+            throw new Error(`聊天世界书仍为 ${verifyChat ?? '未绑定'}`);
+          }
+          appState.chatLorebook = oldName;
+        });
+        shouldVerifyChat = true;
+      }
+
+      progressToast.update('正在更新内部映射...');
+      if (appState.lorebookUsage.has(oldName)) {
+        const linkedChars = appState.lorebookUsage.get(oldName);
+        appState.lorebookUsage.delete(oldName);
+        appState.lorebookUsage.set(newName, linkedChars);
+        console.log(`[RegexLoreHub] Updated lorebookUsage mapping from "${oldName}" to "${newName}"`);
+      }
+
+      await retryOperation(
+        async () => {
+          await TavernAPI.deleteWorldbook(oldName);
+          const names = (await TavernAPI.getWorldbooks()) ?? [];
+          if (names.includes(oldName)) {
+            throw new Error('旧世界书仍存在，删除失败。');
+          }
+        },
+        {
+          description: '删除旧世界书',
+          onAttempt: (attempt, total) => {
+            const suffix = attempt > 1 ? `（尝试 ${attempt}/${total}）` : '';
+            progressToast.update(`正在删除旧世界书...${suffix}`);
+          },
+        },
+      );
+      cleanupTasks.length = 0;
+
+      progressToast.update('正在刷新数据...');
+      const expectedChatLorebook = appState.chatLorebook;
+      await loadAllData(true);
+
+      if (expectedChatLorebook && appState.chatLorebook !== expectedChatLorebook) {
+        console.log(`[RegexLoreHub] Restoring chat lorebook state after data refresh: "${expectedChatLorebook}"`);
+        appState.chatLorebook = expectedChatLorebook;
+      }
+
+      const allBookNames = appState.allLorebooks.map(book => book.name);
+      if (!allBookNames.includes(newName)) {
+        console.warn(`[RegexLoreHub] 验证失败：刷新后未找到新世界书 "${newName}"。`);
+      }
+      if (allBookNames.includes(oldName)) {
+        console.warn(`[RegexLoreHub] 验证失败：刷新后旧世界书 "${oldName}" 仍然存在。`);
+      }
+
+      if (shouldVerifyGlobal) {
+        const finalGlobalBooks = await TavernAPI.getGlobalWorldbookNames();
+        if (!Array.isArray(finalGlobalBooks) || !finalGlobalBooks.includes(newName)) {
+          console.warn(`[RegexLoreHub] 验证失败：全局世界书未包含 "${newName}"。`, finalGlobalBooks);
+        }
+        if (Array.isArray(finalGlobalBooks) && finalGlobalBooks.includes(oldName)) {
+          console.warn(`[RegexLoreHub] 验证失败：全局世界书仍包含 "${oldName}"。`, finalGlobalBooks);
+        }
+      }
+
+      if (shouldVerifyChat) {
+        try {
+          const finalChatLorebook = await TavernAPI.getChatWorldbookName();
+          if (finalChatLorebook !== newName) {
+            console.warn(
+              `[RegexLoreHub] 验证失败：聊天世界书未更新为 "${newName}"，当前值 "${finalChatLorebook ?? '未绑定'}"。`,
+            );
+            appState.chatLorebook = finalChatLorebook;
+          }
+        } catch (verifyError) {
+          console.warn('[RegexLoreHub] 验证聊天世界书状态失败:', verifyError);
+        }
+      }
+
+      progressToast.remove();
+      showToast('世界书重命名成功');
+      if (isDetailView) {
+        await handleEnterLorebookDetail(newName);
+      } else {
+        renderContent();
+      }
+    } catch (error) {
+      progressToast.remove();
+      console.error('[RegexLoreHub] Rename failed:', error);
+      if (cleanupTasks.length > 0) {
+        await runCleanupTasks();
+        await presentCleanupModal(error?.message ?? '重命名过程中发生错误。');
+      } else {
+        await showModal({
+          type: 'alert',
+          title: '重命名失败',
+          text: `操作失败: ${error?.message ?? '未知错误'}`,
+        });
+      }
+
+      await loadAllData(true);
+
+      if (currentChatLorebook && appState.chatLorebook !== currentChatLorebook) {
+        console.log(`[RegexLoreHub] Restoring chat lorebook state after error recovery: "${currentChatLorebook}"`);
+        appState.chatLorebook = currentChatLorebook;
+      }
+
+      try {
+        const context = parentWin.SillyTavern.getContext() || {};
+        const hasActiveChat = context.chatId !== undefined && context.chatId !== null;
+        if (hasActiveChat) {
+          const finalChatLorebook = await TavernAPI.getChatWorldbookName();
+          if (finalChatLorebook !== appState.chatLorebook) {
+            console.log(`[RegexLoreHub] Final chat lorebook sync after error recovery: "${finalChatLorebook}"`);
+            appState.chatLorebook = finalChatLorebook;
+          }
+        }
+      } catch (syncError) {
+        console.warn('[RegexLoreHub] Failed to sync chat lorebook state after error recovery:', syncError);
+      }
     }
-  }
   });
 
 
@@ -675,12 +933,13 @@ export function createLorebookHandlers(deps = {}) {
     const isEntryMultiSelect = appState.multiSelectMode && appState.multiSelectTarget === 'entry';
     let targetEntries = entries;
     if (isEntryMultiSelect) {
-      const selectionPrefix = `lore:${resolvedBookName}:`;
+      const selectionPrefix = buildLoreSelectionPrefix(resolvedBookName);
       const selectedUidSet = new Set();
       appState.selectedItems.forEach(key => {
         if (typeof key !== 'string' || !key.startsWith(selectionPrefix)) return;
-        const rawId = key.slice(selectionPrefix.length);
-        const numericId = Number(rawId);
+        const encodedId = key.slice(selectionPrefix.length);
+        const decodedId = decodeSelectionPart(encodedId);
+        const numericId = Number(decodedId);
         if (Number.isFinite(numericId)) selectedUidSet.add(numericId);
       });
       if (selectedUidSet.size === 0) {
