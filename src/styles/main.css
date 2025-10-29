@@ -751,6 +751,63 @@
     color: var(--rlh-text-color) !important;
   }
 
+  #regex-lore-hub-panel .rlh-search-action-btn,
+  #regex-lore-hub-panel .rlh-multi-select-action-btn {
+    color: var(--rlh-text-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-multi-select-action-btn.enable {
+    color: var(--rlh-green) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-multi-select-action-btn.disable {
+    color: var(--rlh-red) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-rename-save-btn {
+    color: var(--rlh-green) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-rename-cancel-btn {
+    color: var(--rlh-red) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-toolbar-toggle-btn {
+    color: var(--rlh-text-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-toolbar-toggle-btn:hover {
+    color: var(--rlh-accent-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-action-btn {
+    color: #fff !important;
+  }
+
+  #regex-lore-hub-panel .rlh-action-btn.rlh-maximize-btn {
+    color: var(--rlh-text-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-modal-btn {
+    color: var(--rlh-text-color) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-modal-btn.rlh-modal-ok {
+    color: #fff !important;
+  }
+
+  #regex-lore-hub-panel .rlh-modal-btn.rlh-modal-cancel {
+    color: var(--rlh-red) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-error-retry-btn {
+    color: var(--rlh-red) !important;
+  }
+
+  #regex-lore-hub-panel .rlh-error-retry-btn:hover {
+    color: #fff !important;
+  }
+
   .rlh-search-field {
     display: flex;
     align-items: center;
