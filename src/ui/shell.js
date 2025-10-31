@@ -211,10 +211,9 @@ export async function initializeUI(createHandlers) {
   const updateThemeToggleUI = theme => {
     const activeTheme = theme ?? getActiveTheme();
     const activeId = activeTheme?.id ?? '';
-    const activeLabel = getThemeLabel(activeId);
     const $label = $(`#${THEME_TOGGLE_LABEL_ID}`, parentDoc);
     if ($label.length) {
-      $label.text(activeTheme ? `主题：${activeLabel}` : '主题：未设置');
+      $label.text('主题');
     }
     const $wrapper = $(`#${THEME_MENU_WRAPPER_ID}`, parentDoc);
     if ($wrapper.length) {
@@ -444,7 +443,7 @@ export async function initializeUI(createHandlers) {
 
                     <i class="fa-solid fa-palette" aria-hidden="true"></i>
 
-                    <span id="${THEME_TOGGLE_LABEL_ID}" class="rlh-theme-toggle-label">主题：加载中</span>
+                    <span id="${THEME_TOGGLE_LABEL_ID}" class="rlh-theme-toggle-label">主题</span>
 
                     <i class="fa-solid fa-caret-down rlh-theme-toggle-caret" aria-hidden="true"></i>
 
@@ -671,7 +670,7 @@ export async function initializeUI(createHandlers) {
 
       if ($toggleBtn.length) {
 
-        $toggleBtn.text('展开工具栏').attr('aria-expanded', 'false').attr('title', '展开工具栏');
+        $toggleBtn.text('工具栏').attr('aria-expanded', 'false').attr('title', '工具栏');
 
       }
 

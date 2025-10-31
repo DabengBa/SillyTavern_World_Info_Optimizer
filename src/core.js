@@ -362,7 +362,7 @@ export const onThemeChange = listener => {
 
 registerTheme({
   id: 'dark',
-  label: '暗色主题',
+  label: '暗色',
   description: '深色界面，继承现有 dark 样式。',
   order: 0,
   panelClassList: ['dark', 'rlh-theme-dark'],

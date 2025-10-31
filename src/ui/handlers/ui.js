@@ -115,9 +115,9 @@ export const toggleToolbar = errorCatched(async event => {
 
   const $toggleButton = event?.currentTarget ? $(event.currentTarget) : $panel.find(`#${DOM_ID.TOGGLE_TOOLBAR_BTN}`);
   if ($toggleButton.length) {
-    $toggleButton.text(willCollapse ? '展开工具栏' : '折叠工具栏');
+    $toggleButton.text(willCollapse ? '工具栏' : '工具栏');
     $toggleButton.attr('aria-expanded', String(!willCollapse));
-    $toggleButton.attr('title', willCollapse ? '展开工具栏' : '折叠工具栏');
+    $toggleButton.attr('title', willCollapse ? '工具栏' : '工具栏');
   }
 });
 // --- UI 事件处理 ---
