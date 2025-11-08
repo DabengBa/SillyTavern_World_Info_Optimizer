@@ -29,31 +29,6 @@
     --rlh-status-vectorized: #a855f7;
     --rlh-primary-btn-text-color: #ffffff;
     --rlh-danger-btn-text-color: #ffffff;
-    --rlh-disabled-muted-base: #94a3b8;
-    --rlh-disabled-text-strength: 55%;
-    --rlh-disabled-text-color: var(--rlh-disabled-muted-base);
-  }
-
-  /* 保护作用域：输入控件（覆盖宿主 input, select, button 全局规则） */
-  #regex-lore-hub-panel input,
-  #regex-lore-hub-panel select,
-  #regex-lore-hub-panel textarea,
-  #regex-lore-hub-panel button {
-    color: var(--rlh-text-color) !important;
-  }
-
-  #regex-lore-hub-panel input,
-  #regex-lore-hub-panel select,
-  #regex-lore-hub-panel textarea {
-    background-color: var(--rlh-input-bg) !important;
-    border-color: var(--rlh-border-color) !important;
-  }
-
-  /* 占位符颜色统一 */
-  #regex-lore-hub-panel input::placeholder,
-  #regex-lore-hub-panel textarea::placeholder {
-    color: var(--rlh-text-color);
-    opacity: 0.6;
   }
 
   #regex-lore-hub-panel.dark {
@@ -77,8 +52,6 @@
     --rlh-status-vectorized: #c084fc;
     --rlh-primary-btn-text-color: #ffffff;
     --rlh-danger-btn-text-color: #ffffff;
-    --rlh-disabled-muted-base: #64748b;
-    --rlh-disabled-text-strength: 45%;
   }
 
   #regex-lore-hub-panel.rlh-theme-gruvbox {
@@ -102,8 +75,6 @@
     --rlh-status-vectorized: #b16286;
     --rlh-primary-btn-text-color: #fbf1c7;
     --rlh-danger-btn-text-color: #fbf1c7;
-    --rlh-disabled-muted-base: #282828;
-    --rlh-disabled-text-strength: 60%;
   }
 
   /* Gruvbox Dark / 琥珀夜航 */
@@ -128,8 +99,6 @@
     --rlh-status-vectorized: #d3869b;
     --rlh-primary-btn-text-color: #ebdbb2;
     --rlh-danger-btn-text-color: #ebdbb2;
-    --rlh-disabled-muted-base: #bdae93;
-    --rlh-disabled-text-strength: 55%;
   }
 
   /* Slate Dim / 石板微光 */
@@ -154,8 +123,6 @@
     --rlh-status-vectorized: #a855f7;
     --rlh-primary-btn-text-color: #ffffff;
     --rlh-danger-btn-text-color: #ffffff;
-    --rlh-disabled-muted-base: #94a3b8;
-    --rlh-disabled-text-strength: 50%;
   }
 
   /* Aurora / 极光澄蓝 */
@@ -180,18 +147,6 @@
     --rlh-status-vectorized: #0f766e;
     --rlh-primary-btn-text-color: #1d2a2a;
     --rlh-danger-btn-text-color: #ffffff;
-    --rlh-disabled-muted-base: #4b5d5d;
-    --rlh-disabled-text-strength: 50%;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    #regex-lore-hub-panel {
-      --rlh-disabled-text-color: color-mix(
-        in srgb,
-        var(--rlh-text-color) var(--rlh-disabled-text-strength, 60%),
-        var(--rlh-disabled-muted-base)
-      );
-    }
   }
 
   @keyframes rlhFadeInUp {
@@ -340,8 +295,7 @@
     position: relative;
     background: var(--rlh-surface-color);
     border: 1px solid var(--rlh-border-color);
-    /* 简化主容器阴影：大列表场景下减负 */
-    box-shadow: 0 2px 8px -4px var(--rlh-shadow-color);
+    box-shadow: 0 32px 120px -60px var(--rlh-shadow-color);
     max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
@@ -416,6 +370,11 @@
     font-size: 0.78rem;
   }
 
+  .rlh-shell-dot {
+    color: color-mix(in srgb, var(--rlh-em-color) 80%, transparent);
+    font-size: max(0.8125rem, 13px);
+    line-height: 1;
+  }
 
   .rlh-shell-updated {
     font-size: 0.78rem;
@@ -484,8 +443,8 @@
     height: 2.25rem;
     width: 2.25rem;
     border-radius: 9999px;
-    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background-color: var(--rlh-surface-color);
+    border: 1px solid transparent;
+    background-color: transparent;
     color: var(--rlh-text-color);
     transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
     cursor: pointer;
@@ -827,8 +786,7 @@
     border-radius: 16px;
     background-color: color-mix(in srgb, var(--rlh-surface-color) 95%, var(--rlh-accent-color) 5%);
     border: 1px solid color-mix(in srgb, var(--rlh-accent-color) 24%, var(--rlh-border-color));
-    /* 简化工具栏阴影：减弱视觉负担 */
-    box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--rlh-shadow-color) 70%, transparent);
+    box-shadow: 0 16px 42px -34px color-mix(in srgb, var(--rlh-shadow-color) 78%, transparent);
   }
 
   /* 手机：工具栏更紧凑 */
@@ -1123,9 +1081,9 @@
 
   /* 对于未使用 rlh-btn-danger 类的 .disable 状态按钮 */
   #regex-lore-hub-panel .rlh-multi-select-action-btn.disable:not(.rlh-btn-danger) {
-    color: color-mix(in srgb, var(--rlh-text-color) 55%, var(--rlh-surface-color) 45%);
-    border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background-color: var(--rlh-surface-color);
+    color: var(--rlh-danger-btn-text-color) !important;
+    border-color: color-mix(in srgb, var(--rlh-red) 60%, transparent) !important;
+    background-color: var(--rlh-red-bg);
   }
 
   #regex-lore-hub-panel .rlh-rename-save-btn {
@@ -1172,59 +1130,13 @@
     color: var(--rlh-danger-btn-text-color) !important;
   }
 
-  /* ===== 输入控件基础样式 ===== */
-  .rlh-input {
-    border-radius: 10px;
-    padding: 0.45rem 0.65rem;
-    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background-color: var(--rlh-input-bg);
-    color: var(--rlh-text-color);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .rlh-input:focus {
-    outline: none;
-    border-color: color-mix(in srgb, var(--rlh-accent-color) 70%, transparent);
-    box-shadow: var(--rlh-focus-ring);
-  }
-
-  .rlh-input::placeholder {
-    color: color-mix(in srgb, var(--rlh-em-color) 70%, transparent);
-  }
-
-  /* 基础输入框错误状态（适用于所有使用 .rlh-input 类的输入框） */
-  .rlh-input.rlh-input-error,
-  .rlh-editor-field input.rlh-input-error,
-  .rlh-editor-field textarea.rlh-input-error,
-  .rlh-editor-field select.rlh-input-error {
-    border-color: var(--rlh-red) !important;
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 20%, transparent);
-  }
-
-  .rlh-input.rlh-input-error:hover,
-  .rlh-editor-field input.rlh-input-error:hover,
-  .rlh-editor-field textarea.rlh-input-error:hover,
-  .rlh-editor-field select.rlh-input-error:hover {
-    background-color: color-mix(in srgb, var(--rlh-red) 12%, var(--rlh-input-bg)) !important;
-  }
-
-  .rlh-input.rlh-input-error:focus,
-  .rlh-editor-field input.rlh-input-error:focus,
-  .rlh-editor-field textarea.rlh-input-error:focus,
-  .rlh-editor-field select.rlh-input-error:focus {
-    border-color: var(--rlh-red) !important;
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 30%, transparent);
-  }
-
   .rlh-search-field {
     display: flex;
     align-items: center;
     width: 100%;
     min-width: 0;
     gap: 0;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
     background-color: var(--rlh-input-bg);
     overflow: hidden;
@@ -1248,11 +1160,10 @@
       "meta meta";
     gap: 0.125rem;
     padding: 0.2rem 0.3rem;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 45%, transparent);
     background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, transparent);
-    /* 简化搜索框阴影：大列表场景下减弱 */
-    box-shadow: 0 1px 4px -2px var(--rlh-shadow-color);
+    box-shadow: 0 8px 28px -24px var(--rlh-shadow-color);
   }
 
   .rlh-search-field .rlh-search-input {
@@ -1260,7 +1171,7 @@
     min-width: 0;
     border: none;
     background: transparent;
-    padding: 0.45rem 0.65rem;
+    padding: 0.4rem 0.6rem;
     color: inherit;
     font-size: 1rem;
   }
@@ -1660,19 +1571,6 @@
     height: 1rem;
     cursor: pointer;
     accent-color: color-mix(in srgb, var(--rlh-accent-color) 85%, transparent);
-    transition: transform 0.15s ease;
-  }
-
-  /* 多选模式下勾选框增强效果 */
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-selection-control input {
-    width: 1.1rem;
-    height: 1.1rem;
-    accent-color: var(--rlh-accent-color);
-  }
-
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-selection-control input:checked {
-    transform: scale(1.1);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-accent-color) 25%, transparent);
   }
 
   .rlh-drag-handle {
@@ -1817,54 +1715,12 @@
 
   #regex-lore-hub-panel.rlh-multi-select-mode .rlh-shell {
     border-color: color-mix(in srgb, var(--rlh-accent-color) 45%, transparent);
-    /* 简化多选模式主容器阴影：与整体简洁风格保持一致 */
-    box-shadow: 0 4px 16px -8px color-mix(in srgb, var(--rlh-accent-color) 35%, var(--rlh-shadow-color));
+    box-shadow: 0 36px 120px -60px color-mix(in srgb, var(--rlh-accent-color) 30%, transparent);
   }
 
   #regex-lore-hub-panel.rlh-multi-select-mode .rlh-selection-count {
     color: color-mix(in srgb, var(--rlh-accent-color) 65%, transparent);
     font-size: max(0.8125rem, 13px);
-  }
-
-  /* 多选模式下的容器 hover 效果：更明显的视觉反馈 */
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-book-group:hover,
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-item-container:hover {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 88%, var(--rlh-selected-bg) 12%);
-    /* 简化多选模式hover阴影：减弱负担但保持区分度 */
-    box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--rlh-accent-color) 50%, var(--rlh-shadow-color));
-  }
-
-  /* 多选模式下的 header hover 效果增强 */
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-global-book-header:hover,
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-item-header:hover {
-    background-color: color-mix(in srgb, var(--rlh-hover-bg) 75%, var(--rlh-selected-bg) 25%);
-  }
-
-  /* 多选模式下的移动设备支持 */
-  @media (hover: none) {
-    #regex-lore-hub-panel.rlh-multi-select-mode .rlh-book-group:active,
-    #regex-lore-hub-panel.rlh-multi-select-mode .rlh-item-container:active {
-      background-color: color-mix(in srgb, var(--rlh-surface-color) 85%, var(--rlh-selected-bg) 15%);
-      /* 简化多选模式移动端active阴影 */
-      box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--rlh-accent-color) 55%, var(--rlh-shadow-color));
-    }
-
-    /* 多选模式下的选中状态移动端增强 */
-    #regex-lore-hub-panel.rlh-multi-select-mode .rlh-book-group.selected:active,
-    #regex-lore-hub-panel.rlh-multi-select-mode .rlh-item-container.selected:active {
-      background-color: color-mix(in srgb, var(--rlh-surface-color) 80%, var(--rlh-selected-bg) 20%);
-      /* 简化多选模式选中移动端active阴影 */
-      box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--rlh-accent-color) 60%, var(--rlh-shadow-color));
-    }
-  }
-
-  /* 多选模式下的增强选中状态：更明显的视觉反馈 */
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-book-group.selected,
-  #regex-lore-hub-panel.rlh-multi-select-mode .rlh-item-container.selected {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 85%, var(--rlh-selected-bg) 15%);
-    border-left: 4px solid var(--rlh-accent-color);
-    /* 简化多选模式增强选中阴影：保持区分度但减弱负担 */
-    box-shadow: 0 6px 20px -10px color-mix(in srgb, var(--rlh-accent-color) 55%, var(--rlh-shadow-color));
   }
 
   .rlh-book-group.editing-entries,
@@ -1897,8 +1753,8 @@
   .rlh-replace-input {
     width: 100%;
     min-width: 0;
-    padding: 0.45rem 0.65rem;
-    border-radius: 10px;
+    padding: 0.4rem 0.6rem;
+    border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
     background-color: var(--rlh-input-bg);
     color: var(--rlh-text-color);
@@ -1922,32 +1778,6 @@
     color: color-mix(in srgb, var(--rlh-em-color) 70%, transparent);
   }
 
-  /* 搜索输入框错误状态 */
-  #rlh-search-input.rlh-input-error,
-  .rlh-search-input.rlh-input-error,
-  #rlh-replace-input.rlh-input-error,
-  .rlh-replace-input.rlh-input-error {
-    border-color: var(--rlh-red) !important;
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 20%, transparent);
-  }
-
-  #rlh-search-input.rlh-input-error:hover,
-  .rlh-search-input.rlh-input-error:hover,
-  #rlh-replace-input.rlh-input-error:hover,
-  .rlh-replace-input.rlh-input-error:hover {
-    background-color: color-mix(in srgb, var(--rlh-red) 12%, var(--rlh-input-bg)) !important;
-  }
-
-  #rlh-search-input.rlh-input-error:focus,
-  .rlh-search-input.rlh-input-error:focus,
-  #rlh-replace-input.rlh-input-error:focus,
-  .rlh-replace-input.rlh-input-error:focus {
-    border-color: var(--rlh-red) !important;
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 30%, transparent);
-  }
-
   .rlh-multi-select-module {
     display: flex;
     flex-direction: column;
@@ -1964,7 +1794,7 @@
     padding: 0.3rem 0.5rem;
     border-radius: 10px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background: var(--rlh-surface-color);
+    background: transparent;
     color: var(--rlh-text-color);
     font-size: 0.78rem;
     line-height: 1;
@@ -2019,56 +1849,8 @@
     font-size: 0.85rem;
   }
 
-  /* 自定义复选框皮肤，确保对勾颜色跟随主题 */
-  .rlh-filter-item input[type='checkbox'] {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 70%, transparent);
-    background-color: var(--rlh-input-bg);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    position: relative;
-    flex-shrink: 0;
-    box-sizing: border-box;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
-  }
-
-  /* 强制隐藏宿主环境可能注入的伪元素 */
-  .rlh-filter-item input[type='checkbox']::before {
-    display: none !important;
-    content: none !important;
-  }
-
-  .rlh-filter-item input[type='checkbox']::after {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    background-color: transparent;
-    transform: scale(0);
-    transform-origin: center;
-    transition: transform 0.14s ease-out, background-color 0.14s ease-out;
-  }
-
-  .rlh-filter-item input[type='checkbox']:checked {
-    border-color: var(--rlh-accent-color);
-    background-color: color-mix(in srgb, var(--rlh-accent-color) 16%, var(--rlh-input-bg));
-  }
-
-  .rlh-filter-item input[type='checkbox']:checked::after {
-    transform: scale(1);
-    background-color: var(--rlh-accent-color);
-  }
-
-  .rlh-filter-item input[type='checkbox']:focus-visible {
-    outline: 2px solid var(--rlh-accent-color);
-    outline-offset: 2px;
+  .rlh-filter-item input {
+    accent-color: color-mix(in srgb, var(--rlh-accent-color) 85%, transparent);
   }
 
   #rlh-multi-select-controls {
@@ -2131,79 +1913,8 @@
     min-height: 0;
     border-radius: 16px;
     background-color: color-mix(in srgb, var(--rlh-surface-color) 96%, transparent);
-    /* 简化条目容器阴影：大列表场景下减负 */
-    box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--rlh-shadow-color) 70%, transparent);
+    box-shadow: 0 16px 46px -38px color-mix(in srgb, var(--rlh-shadow-color) 90%, transparent);
     overflow: hidden;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease, border-left-color 0.2s ease;
-    position: relative;
-  }
-
-  /* 基础选中状态：明确的视觉反馈 */
-  .rlh-book-group.selected,
-  .rlh-item-container.selected {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, var(--rlh-selected-bg) 10%);
-    border-left: 3px solid var(--rlh-accent-color);
-    /* 简化选中状态阴影：与大列表简洁风格保持一致 */
-    box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--rlh-accent-color) 40%, var(--rlh-shadow-color));
-  }
-
-  /* 禁用状态：系统化弱化方案 */
-  .rlh-book-group:not(.enabled),
-  .rlh-item-container:not(.enabled) {
-    opacity: 0.8;
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 92%, #94a3b8 8%);
-    border-left: 3px solid color-mix(in srgb, #94a3b8 60%, var(--rlh-border-color));
-    box-shadow: 0 4px 16px -12px color-mix(in srgb, #64748b 70%, var(--rlh-shadow-color));
-  }
-
-  .rlh-book-group:not(.enabled) .rlh-item-name,
-  .rlh-item-container:not(.enabled) .rlh-item-name,
-  .rlh-book-group:not(.enabled) .rlh-item-meta,
-  .rlh-item-container:not(.enabled) .rlh-item-meta {
-    color: var(--rlh-disabled-text-color);
-  }
-
-  /* 禁用状态下的 hover 效果减弱 */
-  .rlh-book-group:not(.enabled):hover,
-  .rlh-item-container:not(.enabled):hover {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, #94a3b8 10%);
-  }
-
-  /* 容器级 hover 效果：整个可点击区域高亮 */
-  .rlh-book-group:hover,
-  .rlh-item-container:hover {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 92%, var(--rlh-hover-bg) 8%);
-  }
-
-  /* 选中条目的 hover 效果增强 */
-  .rlh-book-group.selected:hover,
-  .rlh-item-container.selected:hover {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 85%, var(--rlh-selected-bg) 15%);
-    /* 简化选中hover阴影：保持视觉层级但减弱负担 */
-    box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--rlh-accent-color) 45%, var(--rlh-shadow-color));
-  }
-
-  /* 选中条目的 hover 效果增强 */
-  .rlh-book-group.selected:hover,
-  .rlh-item-container.selected:hover {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 85%, var(--rlh-selected-bg) 15%);
-    /* 简化选中hover阴影：保持视觉层级但减弱负担 */
-    box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--rlh-accent-color) 45%, var(--rlh-shadow-color));
-  }
-
-  /* 移动设备支持：active 状态 */
-  @media (hover: none) {
-    .rlh-book-group:active,
-    .rlh-item-container:active {
-      background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, var(--rlh-selected-bg) 10%);
-    }
-
-    .rlh-book-group.selected:active,
-    .rlh-item-container.selected:active {
-      background-color: color-mix(in srgb, var(--rlh-surface-color) 82%, var(--rlh-selected-bg) 18%);
-      /* 简化移动端选中active阴影：保持视觉层级但减弱负担 */
-      box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--rlh-accent-color) 50%, var(--rlh-shadow-color));
-    }
   }
 
   .rlh-book-group-header {
@@ -2466,70 +2177,6 @@
     line-height: 1.2;
   }
 
-  /* 来源徽章样式 */
-  .rlh-source-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.12rem 0.5rem;
-    border-radius: 9999px;
-    background: color-mix(in srgb, #f59e0b 20%, transparent);
-    color: #92400e;
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.2;
-    white-space: nowrap;
-  }
-
-  .rlh-source-badge i {
-    font-size: 0.75rem;
-  }
-
-  /* from-card 条目容器特殊样式：受限操作标记 */
-  .rlh-item-container.from-card {
-    border-left: 3px solid color-mix(in srgb, #f59e0b 60%, transparent);
-    background: color-mix(in srgb, #f59e0b 4%, var(--rlh-surface-color));
-  }
-
-  /* 明确标识为"来源受限"状态 */
-  .rlh-item-container.from-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-left: 16px solid transparent;
-    border-top: 16px solid color-mix(in srgb, #f59e0b 45%, transparent);
-    z-index: 1;
-  }
-
-  .rlh-item-container.from-card::after {
-    content: '限';
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #78350f;
-    z-index: 2;
-  }
-
-  .rlh-item-container.from-card .rlh-item-controls .rlh-action-btn-icon:not(.rlh-toggle-btn) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .rlh-item-container.from-card .rlh-item-controls .rlh-action-btn-icon:not(.rlh-toggle-btn):hover {
-    background: initial;
-    border-color: var(--rlh-border-color);
-  }
-
-  /* from-card 禁用 hover 效果 */
-  .rlh-item-container.from-card:hover {
-    background: color-mix(in srgb, #f59e0b 6%, var(--rlh-surface-color));
-  }
-
   .rlh-item-meta-chip i {
     font-size: 0.7rem;
     color: color-mix(in srgb, var(--rlh-accent-color) 75%, var(--rlh-em-color));
@@ -2541,64 +2188,6 @@
 
   #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-meta-chip {
     background: color-mix(in srgb, var(--rlh-hover-bg) 60%, transparent);
-  }
-
-  /* 暗色主题的来源徽章样式 */
-  #regex-lore-hub-panel.dark .rlh-source-badge {
-    background: color-mix(in srgb, #f59e0b 25%, transparent);
-    color: #fbbf24;
-  }
-
-  #regex-lore-hub-panel.dark .rlh-item-container.from-card {
-    border-left-color: color-mix(in srgb, #f59e0b 70%, transparent);
-    background: color-mix(in srgb, #f59e0b 8%, var(--rlh-surface-color));
-  }
-
-  #regex-lore-hub-panel.dark .rlh-item-container.from-card::after {
-    color: #fbbf24;
-  }
-
-  /* Gruvbox 主题的来源徽章样式 */
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-source-badge {
-    background: color-mix(in srgb, #d65d0e 25%, transparent);
-    color: #fe8019;
-  }
-
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-container.from-card {
-    border-left-color: color-mix(in srgb, #d65d0e 70%, transparent);
-    background: color-mix(in srgb, #d65d0e 8%, var(--rlh-surface-color));
-  }
-
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-container.from-card::after {
-    color: #fe8019;
-  }
-
-  /* 暗色主题的禁用状态适配 */
-  #regex-lore-hub-panel.dark .rlh-book-group:not(.enabled),
-  #regex-lore-hub-panel.dark .rlh-item-container:not(.enabled) {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, #475569 10%);
-    border-left-color: color-mix(in srgb, #475569 70%, var(--rlh-border-color));
-    box-shadow: 0 4px 16px -12px #000000;
-  }
-
-  /* Gruvbox 主题的禁用状态适配 */
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-book-group:not(.enabled),
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-container:not(.enabled) {
-    background-color: color-mix(in srgb, var(--rlh-surface-color) 90%, #50463e 10%);
-    border-left-color: color-mix(in srgb, #50463e 70%, var(--rlh-border-color));
-    box-shadow: 0 4px 16px -12px color-mix(in srgb, #50463e 80%, var(--rlh-shadow-color));
-  }
-
-  /* 暗色主题的选中状态适配 */
-  #regex-lore-hub-panel.dark .rlh-book-group.selected,
-  #regex-lore-hub-panel.dark .rlh-item-container.selected {
-    box-shadow: 0 18px 54px -42px color-mix(in srgb, var(--rlh-accent-color) 50%, #000000);
-  }
-
-  /* Gruvbox 主题的选中状态适配 */
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-book-group.selected,
-  #regex-lore-hub-panel.rlh-theme-gruvbox .rlh-item-container.selected {
-    box-shadow: 0 18px 54px -42px color-mix(in srgb, var(--rlh-accent-color) 55%, var(--rlh-shadow-color));
   }
 
   .rlh-item-controls {
@@ -2679,7 +2268,7 @@
   /* 次按钮样式 - 次要操作（刷新/重置筛选等） */
   .rlh-btn-secondary {
     background-color: color-mix(in srgb, var(--rlh-surface-color) 88%, var(--rlh-accent-color) 12%);
-    color: var(--rlh-secondary-btn-text-color, var(--rlh-text-color));
+    color: var(--rlh-text-color);
     border-color: color-mix(in srgb, var(--rlh-accent-color) 45%, var(--rlh-border-color) 55%);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rlh-accent-color) 25%, transparent);
   }
@@ -2801,22 +2390,22 @@
   .rlh-icon-button,
   .rlh-close-button {
     /* 图标按钮使用次要操作样式 */
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0;
-    border-radius: 9999px;
-    background-color: var(--rlh-surface-color);
-    color: var(--rlh-text-color);
-    border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    padding: 0 !important;
+    border-radius: 9999px !important;
+    background-color: transparent !important;
+    color: var(--rlh-text-color) !important;
+    border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent) !important;
   }
 
   .rlh-action-btn-icon:hover,
   .rlh-toggle-btn:hover,
   .rlh-icon-button:hover,
   .rlh-close-button:hover {
-    background-color: var(--rlh-hover-bg);
-    border-color: color-mix(in srgb, var(--rlh-accent-color) 45%, transparent);
-    color: var(--rlh-text-color);
+    background-color: var(--rlh-hover-bg) !important;
+    border-color: color-mix(in srgb, var(--rlh-accent-color) 45%, transparent) !important;
+    color: var(--rlh-text-color) !important;
   }
 
   /* 图标按钮的危险样式 */
@@ -2855,9 +2444,9 @@
 
   /* 多选操作按钮 - 默认为次要操作 */
   .rlh-multi-select-action-btn {
-    background: var(--rlh-surface-color);
-    color: var(--rlh-text-color);
-    border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
+    background: transparent !important;
+    color: var(--rlh-text-color) !important;
+    border-color: color-mix(in srgb, var(--rlh-border-color) 65%, transparent) !important;
   }
 
   .rlh-multi-select-action-btn:hover {
@@ -2940,7 +2529,7 @@
     height: 2.25rem;
     border-radius: 9999px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background: var(--rlh-surface-color);
+    background: transparent;
     color: var(--rlh-text-color);
     cursor: pointer;
     transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -3095,74 +2684,16 @@
     background-color: transparent;
   }
 
-  /* 保护作用域：输入控件（优先级1：组件级） */
   .rlh-editor-field input[type='text'],
   .rlh-editor-field textarea,
   .rlh-editor-field select {
     width: 100%;
-    /* 继承 .rlh-input 基础样式 */
-  }
-
-  /* Select 下拉选项样式 */
-  .rlh-editor-field select option {
-    background-color: var(--rlh-surface-color);
-    color: var(--rlh-text-color);
     padding: 0.45rem 0.65rem;
-  }
-
-  .rlh-editor-field select option:checked {
-    background-color: var(--rlh-accent-color);
-    color: var(--rlh-text-on-accent);
-  }
-
-  .rlh-editor-field select option:hover {
-    background-color: color-mix(in srgb, var(--rlh-accent-color) 20%, var(--rlh-surface-color));
-  }
-
-  /* 错误状态样式 */
-  .rlh-input-error {
-    border-color: var(--rlh-red) !important;
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 20%, transparent);
-  }
-
-  .rlh-input-error:hover {
-    background-color: color-mix(in srgb, var(--rlh-red) 12%, var(--rlh-input-bg)) !important;
-  }
-
-  .rlh-input-error:focus {
-    background-color: color-mix(in srgb, var(--rlh-red) 8%, var(--rlh-input-bg)) !important;
-    border-color: var(--rlh-red) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rlh-red) 30%, transparent);
-  }
-
-  .rlh-error-text {
-    color: var(--rlh-red);
-    font-size: 0.875rem;
-    line-height: 1.4;
-    display: block;
-    margin-top: 0.25rem;
-  }
-
-  /* 错误提示信息样式 */
-  .rlh-error-message {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background-color: color-mix(in srgb, var(--rlh-red) 10%, transparent);
-    border: 1px solid var(--rlh-red);
-    border-radius: 8px;
-    color: var(--rlh-red);
-    font-size: 0.875rem;
-    line-height: 1.4;
-  }
-
-  .rlh-error-icon {
-    display: inline-block;
-    width: 1rem;
-    height: 1rem;
-    flex-shrink: 0;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
+    background-color: var(--rlh-input-bg);
+    color: var(--rlh-text-color);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .rlh-editor-field label + :is(input, textarea, select) {
@@ -3262,7 +2793,7 @@
     padding: 0.55rem 1.1rem;
     border-radius: 12px;
     border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
-    background: var(--rlh-surface-color);
+    background: transparent;
     color: var(--rlh-text-color);
     font-weight: 500;
     cursor: pointer;
@@ -3275,7 +2806,7 @@
 
   .rlh-modal-btn.rlh-modal-ok {
     background-color: var(--rlh-accent-color);
-    border-color: var(--rlh-accent-color);
+    border-color: transparent;
     color: var(--rlh-primary-btn-text-color);
   }
 
@@ -3606,7 +3137,22 @@
   .rlh-edit-depth-min,
   .rlh-edit-depth-max,
   .rlh-modal-input {
-    /* 继承 .rlh-input 基础样式 */
+    padding: 0.45rem 0.65rem;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--rlh-border-color) 65%, transparent);
+    background-color: var(--rlh-input-bg);
+    color: var(--rlh-text-color);
+  }
+
+  .rlh-edit-depth:focus,
+  .rlh-edit-order:focus,
+  .rlh-edit-probability:focus,
+  .rlh-edit-depth-min:focus,
+  .rlh-edit-depth-max:focus,
+  .rlh-modal-input:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--rlh-accent-color) 70%, transparent);
+    box-shadow: var(--rlh-focus-ring);
   }
 
   @keyframes rlh-spin {
@@ -3786,3 +3332,4 @@
     outline-offset: 2px;
   }
 }
+

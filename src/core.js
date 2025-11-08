@@ -103,6 +103,10 @@ const THEME_TOKEN_ENTRIES = [
   ['statusConstant', '--rlh-status-constant'],
   ['statusSelective', '--rlh-status-selective'],
   ['statusVectorized', '--rlh-status-vectorized'],
+  // 按钮文字色变量
+  ['buttonPrimary', '--rlh-primary-btn-text-color'],
+  ['buttonDanger', '--rlh-danger-btn-text-color'],
+  ['buttonSecondary', '--rlh-secondary-btn-text-color'],
 ];
 
 const THEME_VARIABLES_MAP = {};
@@ -379,6 +383,36 @@ registerTheme({
   metadata: { family: 'gruvbox', variant: 'light-hard' },
 });
 
+registerTheme({
+  id: 'gruvbox-dark',
+  label: '琥珀夜航',
+  description: '高对比 Gruvbox 暗色主题，适合夜间和高对比需求。',
+  order: 2,
+  panelClassList: ['rlh-theme-gruvbox-dark', 'dark'],
+  colorScheme: 'dark',
+  metadata: { family: 'gruvbox', variant: 'dark', contrast: 'high' },
+});
+
+registerTheme({
+  id: 'slate-dim',
+  label: '石板微光',
+  description: '蓝绿微光低亮度护眼主题，适合长时间阅读。',
+  order: 3,
+  panelClassList: ['rlh-theme-slate-dim', 'dark'],
+  colorScheme: 'dark',
+  metadata: { family: 'slate', variant: 'dim', intent: 'long-reading' },
+});
+
+registerTheme({
+  id: 'aurora',
+  label: '极光澄蓝',
+  description: '蓝绿渐变品牌浅色主题，适合展示与分享。',
+  order: 4,
+  panelClassList: ['rlh-theme-aurora'],
+  colorScheme: 'light',
+  metadata: { family: 'aurora', variant: 'light', intent: 'brand-showcase' },
+});
+
 ensureActiveThemeInternal();
 
 const WORLD_BOOK_STATUS_DEFINITIONS = [
@@ -632,7 +666,7 @@ export const isLorebookUnbound = bookOrName => resolveLorebookBindingStats(bookO
 
 const ANALYTICS_EVENT_NAME = 'RegexLoreHubAnalytics';
 const ANALYTICS_DEFAULT_FEATURE = 'select_unbound_lorebooks';
-const ANALYTICS_DEFAULT_VERSION = 'v3.2';
+const ANALYTICS_DEFAULT_VERSION = 'v3.3';
 const ANALYTICS_THROTTLE_INTERVAL_MS = 500;
 const analyticsThrottleState = new Map();
 
@@ -872,15 +906,16 @@ export const showModal = options => {
   const parentDoc = getParentDoc();
   if (!$ || !parentDoc) return Promise.reject();
   return new Promise((resolve, reject) => {
-    const { type = 'alert', title = '通知', text = '', html = '', placeholder = '', value = '' } = options || {};
+    const { type = 'alert', title = '通知', text = '', html = '', placeholder = '', value = '', danger = false } = options || {};
     let buttonsHtml = '';
-    if (type === 'alert') buttonsHtml = '<button class="rlh-modal-btn rlh-modal-ok">确定</button>';
+    const okButtonDangerClass = danger ? ' rlh-btn-danger' : '';
+    if (type === 'alert') buttonsHtml = `<button class="rlh-modal-btn rlh-modal-ok${okButtonDangerClass}">确定</button>`;
     else if (type === 'confirm')
       buttonsHtml =
-        '<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok">确认</button>';
+        `<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok${okButtonDangerClass}">确认</button>`;
     else if (type === 'prompt')
       buttonsHtml =
-        '<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok">确定</button>';
+        `<button class="rlh-modal-btn rlh-modal-cancel">取消</button><button class="rlh-modal-btn rlh-modal-ok${okButtonDangerClass}">确定</button>`;
 
     const inputHtml =
       type === 'prompt'

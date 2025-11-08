@@ -415,7 +415,7 @@ export async function initializeUI(createHandlers) {
 
               <h4>${BUTTON_TOOLTIP}</h4>
 
-              <p class="rlh-shell-meta"><span class="rlh-shell-version">v3.2</span><span class="rlh-shell-dot">·</span><span class="rlh-shell-updated">更新于 2025 年 10 月 21 日</span></p>
+              <p class="rlh-shell-meta"><span class="rlh-shell-version">v3.3</span></p>
 
             </div>
 
@@ -423,7 +423,7 @@ export async function initializeUI(createHandlers) {
 
               <div id="${PREFETCH_INDICATOR_ID}" class="rlh-prefetch-indicator" data-visible="false" aria-hidden="true">
 
-                <div id="${PREFETCH_PROGRESS_TEXT_ID}" class="rlh-prefetch-text" aria-live="polite">后台加载世界书 (0/0)，不影响其他操作</div>
+                <div id="${PREFETCH_PROGRESS_TEXT_ID}" class="rlh-prefetch-text" aria-live="polite">加载中 (0/0)</div>
 
                 <div class="rlh-prefetch-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
 

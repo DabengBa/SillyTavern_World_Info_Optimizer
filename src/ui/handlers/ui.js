@@ -83,6 +83,7 @@ const showReplaceConfirmationModal = (matches, stats, booksMatchedByNameOnly, se
     type: 'confirm',
     title: '确认替换',
     html: modalContent,
+    danger: true,
   });
 };
 
@@ -1496,7 +1497,7 @@ const handleTabRefresh = errorCatched(async tabId => {
   confirmText += ` ${parts.join('和')} 吗？此操作无法撤销。`;
 
   try {
-    await showModal({ type: 'confirm', title: '确认删除', text: confirmText });
+    await showModal({ type: 'confirm', title: '确认删除', text: confirmText, danger: true });
   } catch {
     return; // User cancelled
   }
@@ -1624,7 +1625,7 @@ const handleTabRefresh = errorCatched(async tabId => {
 
 
     try {
-      await showModal({ type: 'confirm', title: '确认清理孤立世界书', text: confirmText });
+      await showModal({ type: 'confirm', title: '确认清理孤立世界书', text: confirmText, danger: true });
     } catch {
       return;
     }

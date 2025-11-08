@@ -328,7 +328,7 @@ const renderGlobalLoreDetailView = (context, searchTerm, $container) => {
             <h2>${escapeHtml(bookName)}</h2>
             <div class="rlh-item-controls">
               <button class="rlh-toolbar-btn rlh-rename-book-btn" title="重命名世界书">重命名</button>
-              <button class="rlh-toolbar-btn rlh-delete-book-btn" title="删除世界书">删除</button>
+              <button class="rlh-toolbar-btn rlh-btn-danger rlh-delete-book-btn" title="删除世界书">删除</button>
             </div>
           </header>
           <div class="rlh-detail-content">
@@ -352,7 +352,7 @@ const renderGlobalLoreDetailView = (context, searchTerm, $container) => {
             <h2>${escapeHtml(bookName)}</h2>
             <div class="rlh-item-controls">
               <button class="rlh-toolbar-btn rlh-rename-book-btn" title="重命名世界书">重命名</button>
-              <button class="rlh-toolbar-btn rlh-delete-book-btn" title="删除世界书">删除</button>
+              <button class="rlh-toolbar-btn rlh-btn-danger rlh-delete-book-btn" title="删除世界书">删除</button>
             </div>
           </header>
           <div class="rlh-detail-content">
@@ -427,7 +427,7 @@ export const renderCharacterLorebookView = (context, searchTerm, $container) => 
           <h2 class="rlh-book-group-title">${escapeHtml(bookName)}</h2>
           <div class="rlh-item-controls">
             <button class="rlh-toolbar-btn rlh-rename-book-btn" title="重命名世界书">重命名</button>
-            <button class="rlh-toolbar-btn rlh-delete-book-btn" title="删除世界书">删除</button>
+            <button class="rlh-toolbar-btn rlh-btn-danger rlh-delete-book-btn" title="删除世界书">删除</button>
           </div>
         </div>
         <div class="rlh-entry-list-wrapper"></div>
@@ -550,7 +550,7 @@ export const renderChatLorebookView = (context, searchTerm, $container) => {
     $container.html(`
       <div class="rlh-chat-lore-empty">
         <p class="rlh-info-text">当前聊天没有绑定的世界书。</p>
-        <button class="rlh-action-btn" id="rlh-create-chat-lore-btn"><i class="fa-solid fa-plus"></i> 创建并绑定聊天世界书</button>
+        <button class="rlh-action-btn rlh-btn-primary" id="rlh-create-chat-lore-btn"><i class="fa-solid fa-plus"></i> 创建并绑定聊天世界书</button>
       </div>
     `);
     return;

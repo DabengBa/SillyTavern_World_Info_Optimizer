@@ -783,7 +783,7 @@ export function createItemHandlers(deps = {}) {
   const uid = Number($item.data('id'));
   const entryName = $item.find('.rlh-item-name').text().trim();
   try {
-    await showModal({ type: 'confirm', title: '确认删除', text: `您确定要删除条目 "${entryName}" 吗？` });
+    await showModal({ type: 'confirm', title: '确认删除', text: `您确定要删除条目 "${entryName}" 吗？`, danger: true });
   } catch {
     return;
   }

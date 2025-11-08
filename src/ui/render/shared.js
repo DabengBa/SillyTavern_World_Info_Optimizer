@@ -121,7 +121,7 @@ const buildSortMenu = (context, currentSort) => {
   if (!items) return '';
   const menuListId = `${SORT_MENU_ID}-list`;
 
-  return `<div class="rlh-sort-menu" id="${SORT_MENU_ID}" data-open="false"><button type="button" id="${SORT_MENU_BUTTON_ID}" class="rlh-toolbar-btn" data-current-sort="${currentSort ?? ''}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${menuListId}"><i class="fa-solid fa-sort"></i><span>排序</span></button><ul class="rlh-sort-menu-list" id="${menuListId}" role="listbox" aria-labelledby="${SORT_MENU_BUTTON_ID}">${items}</ul></div>`;
+  return `<div class="rlh-sort-menu" id="${SORT_MENU_ID}" data-open="false"><button type="button" id="${SORT_MENU_BUTTON_ID}" class="rlh-toolbar-btn rlh-btn-secondary" data-current-sort="${currentSort ?? ''}" aria-haspopup="listbox" aria-expanded="false" aria-controls="${menuListId}"><i class="fa-solid fa-sort"></i><span>排序</span></button><ul class="rlh-sort-menu-list" id="${menuListId}" role="listbox" aria-labelledby="${SORT_MENU_BUTTON_ID}">${items}</ul></div>`;
 };
 
 const buildPositionMenu = context => {
@@ -173,7 +173,7 @@ const buildPositionMenu = context => {
   const buttonAttributes = [
     'type="button"',
     `id="${POSITION_MENU_BUTTON_ID}"`,
-    'class="rlh-toolbar-btn"',
+    'class="rlh-toolbar-btn rlh-btn-secondary"',
     'aria-haspopup="listbox"',
     'aria-expanded="false"',
     `aria-controls="${menuListId}"`,
@@ -247,7 +247,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
             <button class="rlh-multi-select-action-btn" id="rlh-select-invert-btn" title="反选">反</button>
             <button class="rlh-multi-select-action-btn enable" id="rlh-batch-enable-btn" title="启用">开</button>
             <button class="rlh-multi-select-action-btn disable" id="rlh-batch-disable-btn" title="禁用">关</button>
-            <button class="rlh-multi-select-action-btn disable" id="rlh-batch-delete-btn" title="删除">删</button>
+            <button class="rlh-multi-select-action-btn disable rlh-btn-danger" id="rlh-batch-delete-btn" title="删除">删</button>
           </div>
           <span class="rlh-selection-count" id="rlh-selection-count">已选择: ${appState.selectedItems.size}</span>
         </div>
@@ -340,7 +340,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
         const attributes = [
           'type="button"',
           `id="${TOGGLE_RECURSION_BTN_ID}"`,
-          'class="rlh-toolbar-btn rlh-batch-recursion-btn"',
+          'class="rlh-toolbar-btn rlh-btn-secondary rlh-batch-recursion-btn"',
         ];
         if (targetBookName) {
           attributes.push(`data-book-name="${escapeHtml(targetBookName)}"`);
@@ -357,7 +357,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
         const attributes = [
           'type="button"',
           `id="${FIX_KEYWORDS_BTN_ID}"`,
-          'class="rlh-toolbar-btn rlh-fix-keywords-btn"',
+          'class="rlh-toolbar-btn rlh-btn-secondary rlh-fix-keywords-btn"',
         ];
         if (targetBookName) {
           attributes.push(`data-book-name="${escapeHtml(targetBookName)}"`);
@@ -378,11 +378,11 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
   const searchFieldHtml = `<label class="rlh-search-field">
           <input type="search" id="${SEARCH_INPUT_ID}" class="rlh-search-input" placeholder="${searchPlaceholder}" value="${searchValue}" autocomplete="off" />
         </label>`;
-  const clearButtonHtml = `<button type="button" id="rlh-search-clear-btn" class="rlh-toolbar-icon-btn" title="清空"><i class="fa-solid fa-eraser"></i></button>`;
+  const clearButtonHtml = `<button type="button" id="rlh-search-clear-btn" class="rlh-toolbar-icon-btn rlh-btn-secondary" title="清空"><i class="fa-solid fa-eraser"></i></button>`;
   const searchRowHtml = `<div class="rlh-search-row">${searchFieldHtml}${clearButtonHtml}</div>`;
   const replaceValue = escapeAttr(appState.globalSearch.replace ?? '');
   const replacePanelHtml = context.showReplace
-    ? `<div class="rlh-replace-body"><input type="text" id="${REPLACE_INPUT_ID}" class="rlh-replace-input" placeholder="替换为..." value="${replaceValue}" /><button type="button" id="rlh-replace-btn" class="rlh-toolbar-icon-btn rlh-replace-action" title="替换"><i class="fa-solid fa-repeat"></i></button></div>`
+    ? `<div class="rlh-replace-body"><input type="text" id="${REPLACE_INPUT_ID}" class="rlh-replace-input" placeholder="替换为..." value="${replaceValue}" /><button type="button" id="rlh-replace-btn" class="rlh-toolbar-icon-btn rlh-btn-secondary rlh-replace-action" title="替换"><i class="fa-solid fa-repeat"></i></button></div>`
     : '';
   const searchMetaHtml = `<div class="rlh-search-meta">
           ${filtersHtml}
@@ -394,7 +394,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
   if (context.primaryAction?.visible && context.primaryAction.scope === 'entry') {
     const bookNameForCreate = context.activeBookName ?? '';
     const disabled = !bookNameForCreate;
-    const buttonClasses = ['rlh-toolbar-btn', 'rlh-create-entry-btn'];
+    const buttonClasses = ['rlh-toolbar-btn', 'rlh-btn-primary', 'rlh-create-entry-btn'];
     if (disabled) buttonClasses.push('disabled');
     const attributes = [
       'type="button"',
@@ -411,7 +411,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
 
   let createBookButtonHtml = '';
   if (context.primaryAction?.visible && context.primaryAction.scope === 'book') {
-    const buttonClasses = ['rlh-toolbar-btn', 'rlh-create-book-btn'];
+    const buttonClasses = ['rlh-toolbar-btn', 'rlh-btn-primary', 'rlh-create-book-btn'];
     const attributes = [
       'type="button"',
       'id="regex-lore-hub-create-lorebook-btn"',
@@ -426,7 +426,7 @@ export const renderToolbar = (context, { $toolbar, $replaceContainer }) => {
 
   const selectUnboundButtonHtml =
     context.id === 'global-lore-list'
-      ? `<button type="button" class="rlh-toolbar-btn rlh-select-unbound" title="一键选中未绑定任何角色卡的世界书"><i class="fa-solid fa-link-slash"></i><span>选择孤立世界书</span></button>`
+      ? `<button type="button" class="rlh-toolbar-btn rlh-btn-secondary rlh-select-unbound" title="一键选中未绑定任何角色卡的世界书"><i class="fa-solid fa-link-slash"></i><span>选择孤立世界书</span></button>`
       : '';
 
   const searchSectionHtml = `
@@ -564,9 +564,9 @@ export const createGlobalLorebookElement = (book, searchTerm, forceShowAllEntrie
                   <div class="rlh-book-stats">条目: ${book.enabledEntryCount} / ${book.entryCount}</div>
               </div>
               <div class="rlh-item-controls">
-                  <button class="rlh-action-btn-icon rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pen-to-square"></i></button>
-                  <button class="rlh-toggle-btn rlh-global-toggle" title="启用/禁用整个世界书"><i class="fa-solid fa-power-off"></i></button>
-                  <button class="rlh-action-btn-icon rlh-delete-book-btn" title="删除世界书"><i class="fa-solid fa-folder-minus"></i></button>
+                  <button class="rlh-action-btn-icon rlh-btn-secondary rlh-rename-book-btn" title="重命名世界书"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button class="rlh-toggle-btn rlh-btn-secondary rlh-global-toggle" title="启用/禁用整个世界书"><i class="fa-solid fa-power-off"></i></button>
+                  <button class="rlh-action-btn-icon rlh-btn-danger rlh-delete-book-btn" title="删除世界书"><i class="fa-solid fa-folder-minus"></i></button>
               </div>
           </div>
           ${usedByChars.length > 0 ? `<div class="rlh-book-summary">${usedByHtml}</div>` : ''}
@@ -580,7 +580,7 @@ export const createGlobalLorebookElement = (book, searchTerm, forceShowAllEntrie
 
   const $content = $element.find('.rlh-collapsible-content');
   const $entryActions = $(
-    `<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-create-entry-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-batch-recursion-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-shield-halved"></i> 全开防递归</button><button class="rlh-action-btn rlh-fix-keywords-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`,
+    `<div class="rlh-entry-actions"><button class="rlh-action-btn rlh-btn-primary rlh-create-entry-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-plus"></i> 新建条目</button><button class="rlh-action-btn rlh-btn-secondary rlh-batch-recursion-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-shield-halved"></i> 全开防递归</button><button class="rlh-action-btn rlh-btn-secondary rlh-fix-keywords-btn" data-book-name="${escapeHtml(book.name)}"><i class="fa-solid fa-check-double"></i> 修复关键词</button></div>`,
   );
   $content.append($entryActions);
 
@@ -833,16 +833,16 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
 
   if (isLore) {
     controlsHtml = `
-      <button class="rlh-action-btn-icon rlh-rename-btn" title="重命名并编辑"><i class="fa-solid fa-pencil"></i></button>
-      <button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
-      <button class="rlh-action-btn-icon rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>
+      <button class="rlh-action-btn-icon rlh-btn-secondary rlh-rename-btn" title="重命名并编辑"><i class="fa-solid fa-pencil"></i></button>
+      <button class="rlh-toggle-btn rlh-btn-secondary rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
+      <button class="rlh-action-btn-icon rlh-btn-danger rlh-delete-entry-btn" title="删除条目"><i class="fa-solid fa-trash-can"></i></button>
     `;
   } else if (fromCard) {
-    controlsHtml = '<button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>';
+    controlsHtml = '<button class="rlh-toggle-btn rlh-btn-secondary rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>';
   } else {
     controlsHtml = `
-      <button class="rlh-action-btn-icon rlh-rename-btn" title="重命名并编辑"><i class="fa-solid fa-pencil"></i></button>
-      <button class="rlh-toggle-btn rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
+      <button class="rlh-action-btn-icon rlh-btn-secondary rlh-rename-btn" title="重命名并编辑"><i class="fa-solid fa-pencil"></i></button>
+      <button class="rlh-toggle-btn rlh-btn-secondary rlh-item-toggle" title="启用/禁用此条目"><i class="fa-solid fa-power-off"></i></button>
     `;
   }
 
@@ -859,6 +859,11 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
   const highlightedName = highlightText(name, searchTerm);
   const statusMeta = isLore ? resolveStatusMeta(item.statusId) : null;
   const statusBadgeHtml = isLore ? buildStatusBadge(statusMeta.id, { shortLabel: true }) : '';
+
+  // 为 fromCard 条目添加来源徽章
+  const sourceBadgeHtml = fromCard
+    ? `<span class="rlh-source-badge" title="此条目来自角色卡，操作能力受限"><i class="fa-solid fa-id-card"></i><span>来自卡</span></span>`
+    : '';
 
   let metaHtml = '';
   if (isLore) {
@@ -879,6 +884,57 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
             <span class="rlh-item-meta-chip"><i class="fa-solid fa-list-ol"></i>顺序 ${orderLabel}</span>
           </div>
         `;
+  } else {
+    // 正则项的附加信息
+    const destination = item?.destination ?? {};
+    const source = item?.source ?? {};
+    const minDepth = item?.min_depth;
+    const maxDepth = item?.max_depth;
+
+    // 处理输出设置标签
+    const destinationLabels = [];
+    if (destination.display) destinationLabels.push('格式显示');
+    if (destination.prompt) destinationLabels.push('格式提示词');
+    const destinationText = destinationLabels.length > 0 ? destinationLabels.join('/') : '默认输出';
+
+    // 处理作用范围标签
+    const sourceMapping = {
+      user_input: '用户输入',
+      ai_output: 'AI输出',
+      slash_command: '斜杠命令',
+      world_info: '世界书',
+    };
+    const activeSources = Object.entries(sourceMapping)
+      .filter(([key]) => Boolean(source?.[key]))
+      .map(([, label]) => label);
+    let sourceText;
+    if (activeSources.length === 0) {
+      sourceText = '未设范围';
+    } else if (activeSources.length === 4) {
+      sourceText = '全部来源';
+    } else {
+      sourceText = activeSources.length <= 2 ? activeSources.join('/') : `${activeSources[0]}等${activeSources.length}项`;
+    }
+
+    // 处理深度范围
+    const hasMin = minDepth !== undefined && minDepth !== null && minDepth !== '';
+    const hasMax = maxDepth !== undefined && maxDepth !== null && maxDepth !== '';
+    let depthText = '无限制';
+    if (hasMin && hasMax) {
+      depthText = `${minDepth} - ${maxDepth}`;
+    } else if (hasMin) {
+      depthText = `≥ ${minDepth}`;
+    } else if (hasMax) {
+      depthText = `≤ ${maxDepth}`;
+    }
+
+    metaHtml = `
+      <div class="rlh-item-meta" title="作用范围与执行参数">
+        <span class="rlh-item-meta-chip"><i class="fa-solid fa-bullseye"></i>范围: ${escapeHtml(sourceText)}</span>
+        <span class="rlh-item-meta-chip"><i class="fa-solid fa-layer-group"></i>深度: ${escapeHtml(depthText)}</span>
+        <span class="rlh-item-meta-chip"><i class="fa-solid fa-arrow-right"></i>输出: ${escapeHtml(destinationText)}</span>
+      </div>
+    `;
   }
 
   const dragStateAttr = dragRequested
@@ -893,6 +949,7 @@ export const createItemElement = (item, type, bookName = '', searchTerm = '', op
           <div class="rlh-item-title-row">
             <span class="rlh-item-name">${highlightedName}</span>
             ${statusBadgeHtml}
+            ${sourceBadgeHtml}
           </div>
           ${metaHtml}
         </div>

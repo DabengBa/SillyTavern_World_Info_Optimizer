@@ -1406,7 +1406,7 @@ const updatePrefetchIndicatorContent = (current, total) => {
   const safeTotal = total > 0 ? total : 1;
   const clamped = Math.min(current, total);
   const percent = Math.round((clamped / safeTotal) * 100);
-  const message = `后台加载世界书 (${clamped}/${total})，不影响其他操作`;
+  const message = `加载中 (${clamped}/${total})`;
   if ($text?.length) $text.text(message);
   if ($bar?.length) $bar.css('width', `${Math.min(percent, 100)}%`);
   if ($barContainer?.length) $barContainer.attr('aria-valuenow', Math.min(percent, 100));

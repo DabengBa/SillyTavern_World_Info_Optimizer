@@ -691,6 +691,7 @@ export function createLorebookHandlers(deps = {}) {
       type: 'confirm',
       title: '确认删除',
       text: `您确定要永久删除世界书 "${bookName}" 吗？此操作无法撤销。`,
+      danger: true,
     });
   } catch {
     return;
